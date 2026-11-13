@@ -251,6 +251,19 @@ pub fn validate_common(flat: &HashMap<String, String>) -> Result<(), ConfigError
             return Err(bad("server.port", "must be 1..65535"));
         }
     }
+    // `config.schema.json` declares these keys as objects, but a document that
+    // writes a section as an inline value (`server: {port: 8080}`) is flattened
+    // to the *leaf* key `server`. Every reader then misses `server.port`, the
+    // whole section silently reverts to defaults and the save still reports
+    // success — the worst possible outcome for a config editor. Reject it here
+    // so the operator sees an error instead of losing the section (F-J03).
+    for section in ["server", "observability", "logging", "alerts"] {
+        // `{}` / `[]` flatten to an empty value and mean "explicitly empty",
+        // which is a legitimate spelling; only a non-empty scalar is the bug.
+        if flat.get(section).is_some_and(|value| !value.is_empty()) {
+            return Err(bad(section, "must be a mapping, not an inline value"));
+        }
+    }
     let history = get_u32(flat, "observability.history_limit", 30);
     if !(1..=1000).contains(&history) {
         return Err(bad("observability.history_limit", "must be 1..1000"));
@@ -473,6 +486,29 @@ mdns:
             let err = validate_text(text).unwrap_err();
             assert_eq!(err.code, "invalid_config");
             assert_eq!(err.field, field);
+        }
+    }
+
+    #[test]
+    fn inline_section_value_is_rejected_not_silently_dropped() {
+        // A flow mapping flattens to the leaf key `server`, so `server.port`
+        // disappears and every reader falls back to its default. Before this
+        // guard the save reported success while discarding the whole section.
+        let err =
+            validate_text("version: 1\ncomponent: lan-mdns\nserver: {port: 8080}\n").unwrap_err();
+        assert_eq!(err.code, "invalid_config");
+        assert_eq!(err.field, "server");
+
+        for section in ["server", "observability", "logging", "alerts"] {
+            let text = format!("version: 1\ncomponent: lan-mdns\n{section}: {{inline: 1}}\n");
+            assert_eq!(
+                validate_text(&text).unwrap_err().field,
+                section,
+                "{section} inline value"
+            );
+            // The documented empty-mapping spelling must stay valid.
+            let empty = format!("version: 1\ncomponent: lan-mdns\n{section}: {{}}\n");
+            assert!(validate_text(&empty).is_ok(), "{section} empty mapping");
         }
     }
 }

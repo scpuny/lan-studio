@@ -3,12 +3,12 @@
 > 内网轻量 ZeroConf 与局域网运维工具箱。
 > 8 个 `lan-*` 组件，统一契约、独立二进制、独立 WebUI、可单独部署。
 
-**当前状态：M2.4 离线管理台完成**（2026-11-13）。管理台已从占位页替换为
+**当前状态：M2 完成（`lan-mdns` 66/66）**（2026-11-13）。管理台已从占位页替换为
 **Vue 3 + TypeScript + Arco Design** 的六区域控制台（状态总览 / 配置管理 / 可观测 /
 日志 / 告警设置 / 版本历史），打包成单个自包含 HTML 编入二进制；同时销项多网卡绑定、
-健康状态灯、在线配置表单与源码双模式、服务导航。66 条功能全集已销项 **65 条**（剩
-`F-J03` API 契约运行态测试）。Rust 单测 79 项、运行态冒烟 **229 项**全绿。逐条销项见
-[`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md)。
+健康状态灯、在线配置表单与源码双模式、服务导航、API 契约运行态测试。四道门禁全绿：
+Rust 单测 **81 项**、静态契约 **21 项**、运行态契约 **70 项**、冒烟 **229 项**。
+逐条销项见 [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md)。
 
 - 完整规格：[`docs/PRD.md`](docs/PRD.md)
 - 指标字典：[`docs/METRICS.md`](docs/METRICS.md)
@@ -24,14 +24,15 @@ lan-studio/
 │   ├── PRD.md             # 唯一权威规格书
 │   ├── M2-CHECKLIST.md    # 66 条功能逐条销项基线
 │   ├── METRICS.md  ALERT-SCHEMA.md  ERROR-CODES.md
-│   └── ADR/               # 0001 M1 / 0002 M2.1 / 0003 M2.2 / 0004 M2.3 / 0005 M2.4
+│   └── ADR/               # 0001 M1 / 0002 M2.1 / 0003 M2.2 / 0004 M2.3 / 0005 M2.4 / 0006 契约门禁
 ├── contracts/             # 机器可读契约（语言无关）
 │   ├── openapi.yaml  config.schema.json  alert-event.json
 │   ├── log-record.json  snapshot.json
 │   └── examples/          # 通过 schema 的示例
 ├── scripts/
-│   ├── verify_contracts.py # M0 契约校验
-│   ├── smoke_mdns.py       # M2.1~M2.4 运行态冒烟（229 项断言）
+│   ├── verify_contracts.py   # 静态契约校验（文档彼此自洽）
+│   ├── test_api_contract.py  # 运行态契约门禁（74 项，比对 openapi 与真实响应）
+│   ├── smoke_mdns.py         # 运行态冒烟（229 项断言）
 │   └── install.sh          # 一键安装 / --upgrade（保留配置与凭据）
 ├── common/                # 公共 crate
 │   ├── config/  crypto/  alert/  dns/  net/  log/  health/
@@ -191,12 +192,20 @@ sudo ./scripts/install.sh --from ./dist   # 使用本地发布目录
 python3 scripts/smoke_mdns.py
 ```
 
+运行态契约门禁（起隔离实例，逐个端点比对 `openapi.yaml` 声明的状态码、统一信封、
+错误码与鉴权矩阵；与静态校验互补）：
+
+```bash
+python3 scripts/test_api_contract.py
+```
+
 设计取舍见
 [`docs/ADR/0001-m1-skeleton-decisions.md`](docs/ADR/0001-m1-skeleton-decisions.md)、
 [`docs/ADR/0002-m2-1-protocol-kernel.md`](docs/ADR/0002-m2-1-protocol-kernel.md)、
 [`docs/ADR/0003-m2-2-observability-security.md`](docs/ADR/0003-m2-2-observability-security.md)、
 [`docs/ADR/0004-m2-3-alerting-gateway-deploy.md`](docs/ADR/0004-m2-3-alerting-gateway-deploy.md) 与
-[`docs/ADR/0005-m2-4-console-typescript.md`](docs/ADR/0005-m2-4-console-typescript.md)。
+[`docs/ADR/0005-m2-4-console-typescript.md`](docs/ADR/0005-m2-4-console-typescript.md) 与
+[`docs/ADR/0006-api-contract-runtime-gate.md`](docs/ADR/0006-api-contract-runtime-gate.md)。
 
 ## 里程碑
 
@@ -204,7 +213,7 @@ python3 scripts/smoke_mdns.py
 | --- | --- | --- |
 | M0 | 契约冻结（本目录全部内容） | **完成** |
 | M1 | monorepo 骨架、`common-*` 最小集、CI、单文件产物 | **完成** |
-| M2 | `lan-mdns` 功能全集 66 条逐条销项 | **进行中（M2.1~M2.4 完成，65/66）** |
+| M2 | `lan-mdns` 功能全集 66 条逐条销项 | **完成（66/66）** |
 | M3 | 其余 P0：`lan-relay` / `lan-ca` / `lan-scan` | 待启动 |
 | M4 | P1：`lan-hosts` / `lan-wol` | 待启动 |
 | M5 | P2：`lan-sync` / `lan-ssdp` + 统一出口 + 生态 DoD | 待启动 |
@@ -214,7 +223,7 @@ python3 scripts/smoke_mdns.py
 - 契约以 `contracts/` 下机器可读文件为准，文字描述冲突时以契约文件为准。
 - 仓库：`https://github.com/scpuny/lan-studio.git`，`origin/main`。
 - 既有 mDNS 服务已进入维护阶段（仅修缺陷、不接新需求），其功能由 `lan-mdns` 承接。
-- M2.4 剩余：`F-J03` 管理 API 契约运行态测试（`scripts/test_api_contract.py`）与
-  PRD 8.1 组件级 DoD 自检。
+- M2 已完成：66/66 销项，PRD 8.1 的 8 项组件级 DoD 逐条核对通过
+  （见 [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md) 第 8 节）。
 - `LAN_MDNS_GROUP` / `LAN_MDNS_PORT` / `LAN_MDNS_GATEWAY_PORT` 仅用于测试隔离；
   生产组播地址、mDNS 端口与网关端口永远取自 YAML。

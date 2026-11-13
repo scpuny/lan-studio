@@ -116,13 +116,18 @@ paths:
     get:
       tags: [config]
       summary: Export a self-contained config snapshot
+      description: >-
+        The snapshot is returned inside the standard ApiOk envelope with `data`
+        shaped as `Snapshot`. ERROR-CODES.md §1 requires every successful
+        /api/* response to use that envelope, so the export is never a bare
+        document. The POST body, by contrast, is a bare `Snapshot`.
       responses:
         "200":
-          description: Snapshot
+          description: Snapshot wrapped in the standard envelope
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Snapshot"
+                $ref: "#/components/schemas/ApiOk"
     post:
       tags: [config]
       summary: Import a config snapshot (validate before write)

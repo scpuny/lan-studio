@@ -1,11 +1,12 @@
-# lan-mdns（M2.4 离线管理台）
+# lan-mdns（M2 完成）
 
 > 内网 `.local` 名字解析与 DNS-SD 服务发现组件。
-> **M2.4 已完成**：管理台由占位页替换为 Vue 3 + TypeScript（strict）+ Arco Design
-> 的六区域控制台，打包成单个自包含 HTML 编入二进制——状态总览（含健康状态灯与服务
-> 导航）、配置管理（表单 + 源码双模式、网卡绑定）、可观测、日志（SSE）、告警设置、
-> 版本历史（回滚 / 导入导出）。66 条功能全集已销项 65 条，仅剩 `F-J03` API 契约
-> 运行态测试，见 [`docs/M2-CHECKLIST.md`](../../docs/M2-CHECKLIST.md)。
+> **M2 已完成（66/66）**：管理台由占位页替换为 Vue 3 + TypeScript（strict）+ Arco
+> Design 的六区域控制台，打包成单个自包含 HTML 编入二进制——状态总览（含健康状态灯
+> 与服务导航）、配置管理（表单 + 源码双模式、网卡绑定）、可观测、日志（SSE）、告警
+> 设置、版本历史（回滚 / 导入导出）。最后一项 `F-J03` 交付为
+> `scripts/test_api_contract.py`（运行态契约门禁）。逐条销项见
+> [`docs/M2-CHECKLIST.md`](../../docs/M2-CHECKLIST.md)。
 
 ## 构建与运行
 
@@ -194,7 +195,8 @@ sudo ./scripts/install.sh --upgrade                         # 升级，保留用
 ## 运行态验收
 
 ```bash
-python3 scripts/smoke_mdns.py
+python3 scripts/smoke_mdns.py          # 229 项：端到端业务行为
+python3 scripts/test_api_contract.py   # 74 项：契约一致性（状态码 / 信封 / 错误码 / 鉴权）
 ```
 
 229 项断言，覆盖：存活 / 就绪、8 条 RR、9+16 指标族、A / PTR / QU 三种真实组播探针
@@ -207,9 +209,8 @@ M2.3 增量覆盖告警链路（健康翻转 / 目标不可达 / 冷却 / 热更
 样式、无外部 script/link、六个区域标题）与 `/api/interfaces` 的绑定模式 /
 `restart_required`。
 
-## 明确不做（M2.4 之后）
+## 明确不做（M2 之后）
 
-- API 契约运行态测试与 CI 门禁（`F-J03`，M2.4 收尾项）
 - 网卡集合的 socket 级热切换（变更需重启进程，已在管理台显式标注）
 - 通用反向代理 / 负载均衡 / TLS 终止 / 请求体缓存（PRD 1.4 红线，永久不做）
 - 钉钉 / 飞书加签 secret 与 Webhook 签名校验（后续 ADR 评估）

@@ -104,6 +104,13 @@ pub struct MdnsConfig {
 
 impl MdnsConfig {
     pub fn from_flat(flat: &HashMap<String, String>) -> Result<Self, ConfigError> {
+        // Same trap as the shared sections in `common_config::validate_common`:
+        // `mdns: {group: ...}` flattens to the leaf key `mdns`, so every
+        // `mdns.*` lookup falls back to its default and the section is lost
+        // while the save still succeeds. Reject the shape instead of guessing.
+        if flat.get("mdns").is_some_and(|value| !value.is_empty()) {
+            return Err(error("mdns", "must be a mapping, not an inline value"));
+        }
         let group_text = get_str(flat, "mdns.group", "224.0.0.251");
         let group: Ipv4Addr = group_text
             .parse()
@@ -622,5 +629,20 @@ mdns:
         let bad_timeout = format!("{}    timeout_seconds: 0\n", base);
         let err = MdnsConfig::from_flat(&parse_flat(&bad_timeout)).unwrap_err();
         assert_eq!(err.field, "mdns.gateway.timeout_seconds");
+    }
+
+    #[test]
+    fn inline_mdns_section_is_rejected() {
+        // `mdns: {group: ...}` flattens to the leaf key `mdns`, so every
+        // `mdns.*` lookup would fall back to its default and the operator's
+        // whole section would be lost while the save reported success.
+        let text = "version: 1\ncomponent: lan-mdns\nmdns: {group: 224.0.0.251}\n";
+        let err = MdnsConfig::from_flat(&parse_flat(text)).unwrap_err();
+        assert_eq!(err.code, "invalid_config");
+        assert_eq!(err.field, "mdns");
+
+        // The empty-mapping spelling stays valid.
+        let empty = "version: 1\ncomponent: lan-mdns\nmdns: {}\n";
+        assert!(MdnsConfig::from_flat(&parse_flat(empty)).is_ok());
     }
 }

@@ -11,7 +11,7 @@
 | **M2.1** | 协议内核 + 配置内核 + mDNS 引擎 | `common-dns` 报文编解码、`common-config` 完整解析、`common-net` 组播收发、`lan-mdns` 真实应答/宣告/探针/摄取；离线报文单测 + 组播闭环 | **done** |
 | **M2.2** | 可观测 + 安全 + 配置生命周期 | 查询审计 / 冲突检测 / 服务地图 / 健康监控 / SSE / 日志轮转；配置保存·快照·回滚·导入导出·热重载；管理员密码与写保护；13 个专有指标族 | **done** |
 | **M2.3** | 告警 + HTTP 网关 + 部署运维 | `common-alert` 五平台适配 + 有界队列 / 冷却 / 重试、健康翻转与冲突触发；静态 Host 网关 + 双开关 + 友好页；Docker / compose / systemd / install.sh / 探针 / 首次启动模板 | **done** |
-| **M2.4** | WebUI + 全量销项 + DoD | TypeScript 离线管理台（Vue 3 + Arco）、健康状态灯与列表、在线配置表单 + 源码双模式、网卡绑定页、服务导航；API 契约测试与 DoD 待收尾 | **进行中（65/66）** |
+| **M2.4** | WebUI + 全量销项 + DoD | TypeScript 离线管理台（Vue 3 + Arco）、健康状态灯与列表、在线配置表单 + 源码双模式、网卡绑定页、服务导航、API 契约运行态门禁 | **完成（66/66）** |
 
 ## 2. 66 条逐条销项
 
@@ -129,9 +129,15 @@
 | --- | --- | --- | --- |
 | F-J01 | 离线报文单元测试 | M2.1 | done |
 | F-J02 | 真实组播端到端测试 | M2.1 | done |
-| F-J03 | 管理 API 契约测试 + CI 门禁 | M2.4 | pending |
+| F-J03 | 管理 API 契约测试 + CI 门禁 | M2.4 | done |
 
-**合计：10 个能力域 / 66 条；已销项 65 条（剩余 1 条：F-J03 API 契约运行态测试与 CI 门禁）。**
+**合计：10 个能力域 / 66 条；已销项 66 条（M2 全部完成）。**
+
+> `F-J03` 的交付物是 `scripts/test_api_contract.py`：真正拉起二进制，对
+> `openapi.yaml` 的 **24 个操作 / 22 个路径**逐个发请求，断言「状态码是契约给该操作
+> 声明过的」「成功必是 `ApiOk` 信封」「错误必是 `ApiError` 信封且 code 在 8 值枚举内」，
+> 并覆盖 ERROR-CODES §3 的 6 行鉴权矩阵。它和 `verify_contracts.py` 是两道独立门禁：
+> 后者证明**文档之间**自洽，前者证明**运行中的二进制**与文档一致。
 
 ## 3. 契约端点对照（22 个，`contracts/openapi.yaml`）
 
@@ -355,13 +361,60 @@ Vite 打包成单个自包含 HTML（约 804 KB）后由 `common-webui` 编入�
 | `F-D04` | 状态总览页：6 个状态灯（引擎 / 写保护 / 网关 / 告警 / 健康 / 冲突）+ 健康目标表（状态 / 别名 / 目标 / 延迟 / 最近检查），空态引导到配置页 |
 | `F-E04` | 配置页 8 个子 tab 表单 + 「源码模式」；双向切换（进源码按表单重生成、离开源码尝试回解析），保存走服务端离线校验并映射 `invalid_config` / `setup_required` / `auth_failed` |
 | `F-H05` | 状态总览页「服务导航」：已登记服务直达 / `/go/?host=` 跳转 / 复制地址，网关关闭时提示原因并保留直达 |
-| `F-J03` | **待交付** |
+| `F-J03` | `scripts/test_api_contract.py`：起 3 个隔离实例（默认 / 带 Token / 漂移核对），覆盖 24 个操作的成功路径、6 行鉴权矩阵、8 值枚举封闭性、`X-Request-Id` 回显、凭据泄漏扫描与日志磁盘上界；`openapi.yaml` 与路由表双向比对（文档缺实现 / 实现缺文档都会红） |
 
 验收（M2.4 批次）：`npm run typecheck` 0 error、`npm run check:render` 12/12 标记 +
-14 tab + 10 面板 + 0 控制台报错、`cargo test --workspace` **79 passed**、
-`scripts/verify_contracts.py` 21 passed、`scripts/smoke_mdns.py` **229 passed**、产物
-2,382,424 字节。设计取舍见 `docs/ADR/0005-m2-4-console-typescript.md`。
+14 tab + 10 面板 + 0 控制台报错、`cargo test --workspace` **81 passed**、
+`scripts/verify_contracts.py` **21 passed**、`scripts/test_api_contract.py` **74 passed
+（无 PyYAML 时 73，少一条扫描器互校）**、`scripts/smoke_mdns.py` **229 passed**、产物
+2,384,216 字节。设计取舍见 `docs/ADR/0005-m2-4-console-typescript.md` 与
+`docs/ADR/0006-api-contract-runtime-gate.md`。
 
-**剩余 1 条**：`F-J03` 管理 API 契约运行态测试（`scripts/test_api_contract.py`：
-对 `openapi.yaml` 全部端点断言状态码 / 统一信封 / 错误码 / 鉴权矩阵）纳入 CI，
-随后按 PRD 8.1 完成组件级 DoD 核对并 66 条全部销项。
+### 7.6 M2.4 契约测试发现并修掉的三个真实偏差
+
+运行态测试的价值在于它**不信任任何文档**，因此第一次跑就抓到三处真实问题：
+
+1. **`GET /api/config/snapshot` 的响应形状与文档不符** —— 实现是
+   `ok(req, &snap.to_json())`（统一信封，`data` 为快照），而 `openapi.yaml` 把它
+   声明成裸 `Snapshot`。按 `ERROR-CODES.md` §1「成功响应恒为信封」判定**文档错**，
+   已改 `openapi.yaml` 并补 `description` 说明 GET（信封）与 POST（裸文档）的不对称。
+2. **信封例外没有登记** —— `/api/metrics`（Prometheus 文本）与 `/api/logs/stream`
+   （SSE 帧）同为 `/api/*` 却不套信封，与「恒为信封」的措辞冲突。已在
+   `ERROR-CODES.md` 新增 §1.1 白名单，逐条说明理由，并明确快照导出**不属于**例外。
+3. **`server: {port: 8080}` 这类内联段写法被静默吞掉** —— `parse_flat` 只支持块
+   风格，内联映射会塌缩成叶子键 `server`，于是所有 `server.*` 取值回落到默认值、
+   整段配置丢失，而保存仍返回 `saved:true`。已让 `validate_common` 与
+   `MdnsConfig::from_flat` 拒绝「段键带非空标量值」的形状（`{}` / `[]` 空映射仍合法），
+   并各加一条单元测试锁住。
+
+> 附带教训：手动排查时把 `LAN_STUDIO_CONFIG` 直接指向仓库里的
+> `config.template.yaml` 做保存实验，会把该文件写坏；而它是 `include_str!` 进二进制的，
+> 于是 `--print-config` 也一起被污染。所有会写配置的验证脚本一律复制到临时目录再跑
+> （`smoke_mdns.py` / `test_api_contract.py` 都已如此）。
+
+## 8. PRD 8.1 组件级 Definition of Done 自检
+
+PRD 8.1 规定「一个组件只有全部满足以下条件才算完成」。逐条给出可复跑的核对方式，
+不以「已实现」代替证据。
+
+| # | 条件（PRD 8.1） | 状态 | 证据 |
+| --- | --- | --- | --- |
+| 1 | 第 3 章统一契约全部通过契约测试 | **满足** | 8 个契约面各有门禁：API（`test_api_contract.py` 24 个操作）、配置（`config.schema.json` + `validate_common` 单测 + 三类非法配置运行态拒绝）、指标（9 个必备族运行态断言 + `METRICS.md` 比对）、告警（`alert-event.json` + 冒烟 F-G01~F-G05）、日志（`log-record.json` + 结构化字段断言 + 无凭据扫描）、快照（`snapshot.json` + 导出/导入/回滚闭环）、鉴权（ERROR-CODES §3 六行矩阵）、健康检查（`/healthz` 体形状 + `/readyz` + 业务健康不走错误码） |
+| 2 | 第 4 章该组件验收项全部通过 | **满足** | 66/66 逐条销项，见第 1 节总表；M2.4 证据见 7.5 |
+| 3 | 单文件产物启动、`/healthz` 为 `{"ok":true}`、`/api/metrics` 含必备指标族 | **满足** | 仓库产物为单个 ELF、无外部资源；`release.yml` 构建 `x86_64/aarch64-unknown-linux-musl` 并断言 `statically linked`；`/healthz` 体**恰好**为 `{"ok":true}`（契约测试第 5 项逐字符比对）；9 个 `lanstudio_mdns_*` 必备族运行态断言（第 7 项） |
+| 4 | WebUI 完全离线、无外部资源请求 | **满足** | 产物为单 HTML（内联 `<style>` + 内联 module）；`common/webui` 单测对 **8 类被浏览器拉取的资源**逐条断言不出现（`<script src=`、`<link rel="stylesheet"`、`src/href="http(s)://`、`url(http(s)://`）；冒烟再断言一次「无外部 script/link」；`render-check.mjs` 用 jsdom 求值 bundle 并断言 12 个中文标记 + 6 个 tab + 0 控制台报错 |
+| 5 | 配置保存 → 快照 → 回滚 → 导入导出闭环 | **满足** | 契约测试串起「保存（200，返回快照 id）→ 历史列表含该 id → 回滚到该 id（200）→ 导出快照 → 导入该快照（200）→ 手动 reload（200）」；冒烟另覆盖 checksum 篡改拒绝与路径穿越拒绝 |
+| 6 | 日志无凭据、无结构化字段拼接、磁盘不超上界 | **满足** | 日志为 JSON 记录（`ts/level/source/msg/extra`），`extra` 是对象而非拼接字符串（`log-record.json` schema + 冒烟字段断言）；契约测试新增「日志正文不含本次铸造的密码/Token」「`disk_bytes <= disk_limit_bytes`」「`0 < capacity <= 4096`」三条；`common-log` 单测 `rotation_holds_a_hard_disk_bound` 覆盖轮转硬上界；`common-alert` 对事件正文做凭据关键字脱敏并有单测 |
+| 7 | 有单元测试与端到端测试，CI 全绿 | **满足** | `cargo test --workspace` **81 passed**；`cargo clippy --workspace --all-targets -D warnings` 与 `cargo fmt --check` 在 CI 中执行；端到端为 `smoke_mdns.py` **229** + `test_api_contract.py` **74** + `render-check.mjs`；CI 分 `webui` 与 `verify` 两个 job，前端 job 不污染 Rust 的零 Node 依赖 |
+| 8 | 有组件 README（配置说明、契约端点、运维命令） | **满足** | `components/lan-mdns/README.md`：构建与运行 / 配置要点 / 环境变量 / 已实现端点（按 5 类分组）/ 部署 / 实现位置 / 运行态验收 / 明确不做 |
+
+### 8.1 未列入 8.1 但已备案的偏差
+
+| 事项 | 处置 |
+| --- | --- |
+| `rate_limited`（429）在 `lan-mdns` 永不产生 | 契约是整个生态共享词汇表；限流属 `lan-scan` / `lan-relay`。已在契约测试里以 NOTE 显式记录，禁止为凑数伪造 |
+| `target_unreachable`（503）不以 JSON 产生 | ERROR-CODES §2 将其指派给网关友好页（HTML）。网关 503 由冒烟覆盖 |
+| `internal_error`（500）运行态不可稳定触发 | 仅存在于运行时状态缺失的启动窗口；由 `common-api` 单测覆盖，契约测试不注入故障 |
+| 本地开发构建为 glibc 动态链接 | 发布产物走 musl 静态（`release.yml` 断言）；本机无 musl 工具链，故以 CI 断言为证据 |
+
+**结论：PRD 8.1 的 8 项条件全部满足，`lan-mdns` 达到组件级 DoD。M2 完成（66/66）。**

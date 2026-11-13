@@ -16,6 +16,19 @@
 - `code` 必须来自第 2 节枚举；`message` 人类可读，**不得包含凭据、堆栈、内部路径**。
 - `request_id` 同时写入结构化日志 `extra`，用于串联排查。
 - 成功响应恒为 `{"ok":true,"data":{...},"request_id":"..."}`。
+- 客户端可用 `X-Request-Id` 指定追踪号，服务端原样回显为 `request_id`。
+
+### 1.1 信封例外（白名单，逐条登记）
+
+以下端点**不套**统一信封，因为它们承载的不是业务数据而是特定线格式。新增例外必须先改本节并同步 `contracts/openapi.yaml`。
+
+| 端点 | 线格式 | 理由 |
+| --- | --- | --- |
+| `GET /healthz` | 裸 `{"ok":true}` | 探针要能被任意检测器解析，不引入额外层级 |
+| `GET /api/metrics` | `text/plain`（Prometheus 0.0.4） | 抓取端固定解析此格式 |
+| `GET /api/logs/stream` | `text/event-stream`（SSE） | 逐帧推送，无法包成单次 JSON |
+
+`GET /api/config/snapshot` **不属于**例外：导出内容作为 `data` 放进信封，`data` 的形状为 `Snapshot`。
 
 ## 2. 错误码枚举
 

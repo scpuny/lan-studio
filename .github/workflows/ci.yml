@@ -81,6 +81,15 @@ jobs:
       - name: Build release artifact
         run: cargo build --release -p lan-mdns
 
+      - name: API contract test (runtime conformance, F-J03)
+        env:
+          LAN_CONTRACT_MDNS_PORT: "25353"
+          LAN_CONTRACT_MDNS_GROUP: "239.1.2.4"
+        run: |
+          set -e
+          python3 -m py_compile scripts/test_api_contract.py
+          python3 scripts/test_api_contract.py
+
       - name: Smoke test artifact (M2.1 + M2.2 + M2.3 runtime, isolated multicast)
         env:
           LAN_STUDIO_CONFIG: components/lan-mdns/config.template.yaml
