@@ -1,0 +1,13 @@
+[package]
+name = "common-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio zero-dependency HTTP server and unified API envelope"
+
+[dependencies]
+common-log = { workspace = true }
+common-auth = { workspace = true }
+common-health = { workspace = true }
+common-metrics = { workspace = true }

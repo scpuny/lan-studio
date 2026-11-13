@@ -1,0 +1,16 @@
+[package]
+name = "lan-mdns"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio mDNS component (M1 skeleton, protocol not implemented yet)"
+
+[dependencies]
+common-config = { workspace = true }
+common-log = { workspace = true }
+common-health = { workspace = true }
+common-auth = { workspace = true }
+common-metrics = { workspace = true }
+common-webui = { workspace = true }
+common-api = { workspace = true }

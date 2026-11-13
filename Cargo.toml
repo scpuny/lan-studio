@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = [
+    "common/config",
+    "common/log",
+    "common/health",
+    "common/auth",
+    "common/metrics",
+    "common/webui",
+    "common/api",
+    "components/lan-mdns",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.75"
+
+[workspace.dependencies]
+common-config = { path = "common/config" }
+common-log = { path = "common/log" }
+common-health = { path = "common/health" }
+common-auth = { path = "common/auth" }
+common-metrics = { path = "common/metrics" }
+common-webui = { path = "common/webui" }
+common-api = { path = "common/api" }

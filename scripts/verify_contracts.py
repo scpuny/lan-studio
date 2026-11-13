@@ -4,6 +4,7 @@
 
 Zero mandatory third-party dependency. PyYAML is optional: when present the
 OpenAPI document and the sample YAML config are also parsed and validated.
+Without PyYAML the 8 YAML-based checks are skipped with a prominent warning.
 Run: python3 scripts/verify_contracts.py
 """
 from __future__ import annotations
@@ -169,10 +170,13 @@ def main() -> int:
         except (OSError, json.JSONDecodeError) as exc:
             check(f"example {sample_name} passes {schema_name}.json", False, str(exc))
 
+    yaml_full = True
     try:
         import yaml
     except ImportError:
-        check("PyYAML available (optional)", True, "skipped: yaml not installed")
+        yaml_full = False
+        print("WARN  PyYAML not installed: 8 YAML-based checks SKIPPED "
+              "(pip install pyyaml for the full 21-check run)")
     else:
         if "config.schema" in schemas:
             try:
@@ -225,7 +229,8 @@ def main() -> int:
         if detail:
             line += f"  | {detail}"
         print(line)
-    print(f"\n{len(RESULTS) - len(failed)} passed / {len(failed)} failed")
+    suffix = "" if yaml_full else "  [DEGRADED: YAML checks skipped]"
+    print(f"\n{len(RESULTS) - len(failed)} passed / {len(failed)} failed{suffix}")
     return 1 if failed else 0
 
 

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML for full contract verification
+        run: python3 -m pip install --disable-pip-version-check pyyaml
+
+      - name: Verify M0 contracts (full)
+        run: python3 scripts/verify_contracts.py
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --workspace
+
+      - name: Build release artifact
+        run: cargo build --release -p lan-mdns
+
+      - name: Smoke test artifact
+        run: |
+          set -e
+          export LAN_STUDIO_PORT=18080
+          export LAN_STUDIO_CONFIG=components/lan-mdns/config.template.yaml
+          ./target/release/lan-mdns &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS --noproxy '*' http://127.0.0.1:18080/healthz >/dev/null 2>&1; then break; fi
+            sleep 0.3
+          done
+          curl -fsS --noproxy '*' http://127.0.0.1:18080/healthz | grep -q '"ok":true'
+          curl -fsS --noproxy '*' http://127.0.0.1:18080/readyz | grep -q '"ok":true'
+          curl -fsS --noproxy '*' http://127.0.0.1:18080/readyz | grep -q '"ready":true'
+          curl -fsS --noproxy '*' http://127.0.0.1:18080/api/metrics | grep -q 'lanstudio_mdns_build_info'
+          curl -fsS --noproxy '*' http://127.0.0.1:18080/api/metrics | grep -q '# TYPE lanstudio_mdns_up gauge'
+          curl -fsS --noproxy '*' http://127.0.0.1:18080/ | grep -q 'Lan Studio'
+          ./target/release/lan-mdns --cli | grep -q 'component=lan-mdns'
+          echo 'SMOKE OK'
+
+      - name: Assert single-file artifact
+        run: |
+          test -f target/release/lan-mdns
+          echo "artifact bytes: $(stat -c %s target/release/lan-mdns)"
