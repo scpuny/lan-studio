@@ -20,7 +20,7 @@
       </span>
       <span class="ls-inline">
         <span class="ls-dot" :class="connected ? 'is-up' : 'is-down'"></span>
-        <span class="ls-note">{{ connected ? '实时流已连接' : '实时流断开，自动重连中' }}</span>
+        <span class="ls-note">{{ streamHint }}</span>
       </span>
       <div class="ls-header-spacer"></div>
       <a-button size="mini" @click="loadBuffer">载入历史</a-button>
@@ -98,8 +98,19 @@ const viewport = ref<HTMLDivElement | null>(null)
 let source: EventSource | null = null
 let seen = new Set<string>()
 
-const diskPercent = computed<number>(() => {
-  const limit = buffer.value.disk_limit_bytes || 0
+/**
+ * `EventSource` is missing in some embedded webviews and in non-browser test
+ * environments. Degrade to "manual refresh only" instead of throwing out of
+ * `onMounted`, which would take the whole console down.
+ */
+const sseSupported = typeof EventSource !== 'undefined'
+
+const streamHint = computed<string>(() => {
+  if (!sseSupported) return '当前环境不支持实时流，请用「载入历史」手动刷新'
+  return connected.value ? '实时流已连接' : '实时流断开，自动重连中'
+})
+
+const diskPercent = computed<number>(() => {  const limit = buffer.value.disk_limit_bytes || 0
   if (!limit) return 0
   return Math.min(100, Math.round((buffer.value.disk_bytes / limit) * 100))
 })
@@ -187,6 +198,10 @@ async function loadBuffer(): Promise<void> {
 }
 
 function connect(): void {
+  if (!sseSupported) {
+    connected.value = false
+    return
+  }
   source?.close()
   source = new EventSource('/api/logs/stream')
   source.onopen = (): void => {

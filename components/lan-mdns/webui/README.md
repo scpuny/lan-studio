@@ -48,7 +48,14 @@ npm ci                # 首次
 npm run dev           # 本地开发（代理到后端见下）
 npm run typecheck     # vue-tsc --noEmit，CI 门禁
 npm run build         # typecheck + vite build → ../../../common/webui/src/assets/index.html
+npm run check:render  # jsdom 里真跑一遍产物，断言确实渲染出来了
+npm run verify        # build + check:render（提交前跑这个）
 ```
+
+`check:render` 用 jsdom 求值打包后的 bundle，断言六个 tab、面板、状态灯与 KPI 单元
+都存在，并且控制台无报错。**类型检查通过 ≠ 页面能画出来**：`EventSource` 缺失、
+`#app` 挂载失败这类问题只有真跑一遍才会暴露。不用 Chrome 是因为它需要
+ptrace / sandbox 权限，CI 与受限容器里往往拿不到；jsdom 只需 Node。
 
 `npm run build` 会**覆盖**被提交的 `common/webui/src/assets/index.html`。改过任何
 `src/` 文件后必须重新构建并一起提交，否则二进制里仍是旧页面（`common-webui` 的单测
@@ -66,5 +73,7 @@ npm run build         # typecheck + vite build → ../../../common/webui/src/ass
 - **刷新不做入场动画**：轮询更新只改数据，不触发过渡（PRD 3.7 防抖动）。
 - **凭据只在会话内**：`sessionStorage`，不写 cookie、不落盘；所有写操作走
   `X-Admin-Password`，由后端统一返回 `409 setup_required` / `403 auth_failed`。
+- **能力缺失要降级，不许抛错**：`EventSource` 不存在时日志页降级为手动刷新并提示，
+  不能从 `onMounted` 里抛出去——那会把整个控制台一起带走。
 - **表单与源码同一份文档**：`config-text.ts` 的解析/序列化必须与服务端
   `common-config::parse_flat` 保持一致，改一边就要改另一边。

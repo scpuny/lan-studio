@@ -346,7 +346,8 @@ M2.4 交付时明确提示，不伪装成热重载能力。
 ### 7.5 M2.4 交付记录
 
 管理台从占位页替换为 **Vue 3 + TypeScript（strict）+ Arco Design** 的六区域控制台，
-Vite 打包成单个自包含 HTML（803,808 字节）后由 `common-webui` 编入二进制。
+Vite 打包成单个自包含 HTML（约 804 KB）后由 `common-webui` 编入二进制；渲染由
+`scripts/render-check.mjs`（jsdom）在 CI 里验证，防「类型通过但白屏」。
 
 | 条目 | 验收证据 |
 | --- | --- |
@@ -356,9 +357,10 @@ Vite 打包成单个自包含 HTML（803,808 字节）后由 `common-webui` 编�
 | `F-H05` | 状态总览页「服务导航」：已登记服务直达 / `/go/?host=` 跳转 / 复制地址，网关关闭时提示原因并保留直达 |
 | `F-J03` | **待交付** |
 
-验收（M2.4 批次）：`npm run typecheck` 0 error、`cargo test --workspace` **79 passed**、
+验收（M2.4 批次）：`npm run typecheck` 0 error、`npm run check:render` 12/12 标记 +
+14 tab + 10 面板 + 0 控制台报错、`cargo test --workspace` **79 passed**、
 `scripts/verify_contracts.py` 21 passed、`scripts/smoke_mdns.py` **229 passed**、产物
-2,382,272 字节。设计取舍见 `docs/ADR/0005-m2-4-console-typescript.md`。
+2,382,424 字节。设计取舍见 `docs/ADR/0005-m2-4-console-typescript.md`。
 
 **剩余 1 条**：`F-J03` 管理 API 契约运行态测试（`scripts/test_api_contract.py`：
 对 `openapi.yaml` 全部端点断言状态码 / 统一信封 / 错误码 / 鉴权矩阵）纳入 CI，

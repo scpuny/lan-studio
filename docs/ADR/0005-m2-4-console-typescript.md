@@ -104,6 +104,20 @@ CI 另加 `webui` job：`npm ci` → `typecheck` → `vite build` → 对产物�
 不是 Promise。因此回滚动作挂在 `onOk` 上，取消对话框绝不会触发写操作——不能用
 `if (await Modal.confirm(...) !== 'ok')` 这种想当然的写法。
 
+### D7 · 用 jsdom 做渲染门禁，而不是浏览器
+
+`vue-tsc` 只能证明类型正确，证明不了页面画得出来。`scripts/render-check.mjs` 把产物
+里的内联 bundle 抽出来，在 jsdom 里求值，断言六个 tab、面板、状态灯与 KPI 单元都渲染
+出来、且控制台零报错。
+
+不用无头 Chrome：它依赖 ptrace / sandbox 权限，在受限容器与本机内核策略下会直接
+SIGTRAP（实测 `ptrace: Operation not permitted`），CI 里更不可靠。jsdom 只需 Node，
+代价是少数 DOM API 要打桩（`ResizeObserver` / `matchMedia` / `EventSource`）。
+
+这个门禁立刻抓到第一个真实缺陷：`LogsPage` 在 `onMounted` 里直接 `new EventSource()`，
+缺少该 API 的环境会抛错。虽然 Vue 仍渲染出其它面板，但这属于「一个可选能力缺失拖垮
+一个页面」。已改为能力探测 + 降级提示（「请用『载入历史』手动刷新」）。
+
 ## 3. 后果
 
 - 前端成为独立工具链（Node 22 + npm），但**不影响** `cargo build` 与发布产物；
@@ -119,7 +133,8 @@ CI 另加 `webui` job：`npm ci` → `typecheck` → `vite build` → 对产物�
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（strict 全开） |
-| `npx vite build` | 单文件 803,808 字节，无外部引用 |
+| `npm run check:render` | 12/12 标记、14 tab、10 面板、14 状态灯、25 KPI、0 控制台报错 |
+| `npx vite build` | 单文件 803,968 字节，无外部引用 |
 | `cargo test --workspace` | 79 passed |
 | `cargo clippy --workspace --all-targets -- -D warnings` | 通过 |
 | `scripts/verify_contracts.py`（完整） | 21 passed |
