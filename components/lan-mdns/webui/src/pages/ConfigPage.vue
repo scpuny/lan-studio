@@ -43,7 +43,6 @@
         <a-tabs
           v-if="loaded"
           v-model:active-key="subTab"
-          size="small"
           type="card-gutter"
           :destroy-on-hide="false"
           @change="onSubTabChange"
@@ -210,7 +209,7 @@
               </div>
               <div class="ls-row">
                 <span class="ls-inline">
-                  <a-switch v-model="service.proxy" size="small" />
+                  <a-switch v-model="service.proxy" />
                   <span class="ls-note">参与内置网关代理（需全局网关开启）</span>
                 </span>
                 <div class="ls-header-spacer"></div>
@@ -313,7 +312,7 @@
               <a-input v-model="host.host" placeholder="printer.local" style="width: 200px" />
               <a-input v-model="host.target" placeholder="192.168.5.30:80" style="width: 220px" />
               <span class="ls-inline">
-                <a-switch v-model="host.proxy" size="small" />
+                <a-switch v-model="host.proxy" />
                 <span class="ls-note">代理</span>
               </span>
               <a-button

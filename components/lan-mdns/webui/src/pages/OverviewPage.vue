@@ -5,12 +5,14 @@
         运行状态
         <span class="ls-hint">每 5 秒静默刷新，不触发布局动画</span>
       </div>
-      <div class="ls-grid">
-        <div v-for="item in lights" :key="item.label" class="ls-inline">
-          <span class="ls-dot" :class="item.cls"></span>
-          <div>
-            <div class="ls-kpi-label">{{ item.label }}</div>
-            <div class="ls-kpi-value small">{{ item.value }}</div>
+      <div class="ls-grid ls-grid--status">
+        <div v-for="item in lights" :key="item.label" class="ls-metric-card">
+          <div class="ls-inline">
+            <span class="ls-dot" :class="item.cls"></span>
+            <div>
+              <div class="ls-kpi-label">{{ item.label }}</div>
+              <div class="ls-kpi-value small">{{ item.value }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -18,8 +20,8 @@
 
     <div class="ls-panel">
       <div class="ls-panel-title">协议计数</div>
-      <div class="ls-grid">
-        <div v-for="item in counters" :key="item.label">
+      <div class="ls-grid ls-grid--counters">
+        <div v-for="item in counters" :key="item.label" class="ls-metric-card">
           <div class="ls-kpi-label">{{ item.label }}</div>
           <div class="ls-kpi-value">{{ item.value }}</div>
           <div v-if="item.foot" class="ls-kpi-foot">{{ item.foot }}</div>

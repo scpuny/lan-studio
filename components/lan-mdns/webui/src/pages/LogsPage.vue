@@ -6,16 +6,16 @@
     </div>
 
     <div class="ls-row" style="margin-bottom: 12px">
-      <a-select v-model="level" style="width: 140px" size="small">
+      <a-select v-model="level" style="width: 160px">
         <a-option value="all">全部级别</a-option>
         <a-option value="debug">debug</a-option>
         <a-option value="info">info</a-option>
         <a-option value="warning">warning</a-option>
         <a-option value="error">error</a-option>
       </a-select>
-      <a-input v-model="keyword" placeholder="关键字过滤" allow-clear size="small" style="width: 220px" />
+      <a-input v-model="keyword" placeholder="关键字过滤" allow-clear style="width: 240px" />
       <span class="ls-inline">
-        <a-switch v-model="follow" size="small" />
+        <a-switch v-model="follow" />
         <span class="ls-note">自动跟随最新</span>
       </span>
       <span class="ls-inline">
@@ -23,8 +23,8 @@
         <span class="ls-note">{{ streamHint }}</span>
       </span>
       <div class="ls-header-spacer"></div>
-      <a-button size="mini" @click="loadBuffer">载入历史</a-button>
-      <a-button size="mini" @click="lines = []">清空视图</a-button>
+      <a-button @click="loadBuffer">载入历史</a-button>
+      <a-button @click="lines = []">清空视图</a-button>
     </div>
 
     <div class="ls-row" style="margin-bottom: 10px">

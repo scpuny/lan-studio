@@ -2,8 +2,9 @@
 //
 // `vue-tsc` proves the code type-checks; it does not prove the page paints.
 // This script evaluates the built single-file bundle inside jsdom and asserts
-// that the app actually mounted: six tabs, the panels, the status lights and the
-// KPI cells must exist. A blank page therefore fails CI instead of shipping.
+// that the app actually mounted: the sidebar navigation (six items), the panels,
+// the status lights and the KPI cells must exist. A blank page therefore fails
+// CI instead of shipping.
 //
 // Chrome is not used on purpose: it needs ptrace/sandbox privileges that CI and
 // restricted containers do not always grant, while jsdom runs anywhere Node does.
@@ -79,20 +80,20 @@ setTimeout(() => {
   const app = document.getElementById('app')
   const text = app ? (app.textContent ?? '') : ''
   const missing = marker.filter((item) => !text.includes(item))
-  const tabs = document.querySelectorAll('.arco-tabs-tab').length
+  const navItems = document.querySelectorAll('.ls-nav-item').length
   const panels = document.querySelectorAll('.ls-panel').length
   const dots = document.querySelectorAll('.ls-dot').length
   const kpi = document.querySelectorAll('.ls-kpi-value').length
 
   console.log(`markers  : ${marker.length - missing.length}/${marker.length}` +
     (missing.length ? `  missing=${JSON.stringify(missing)}` : ''))
-  console.log(`tabs     : ${tabs}  panels: ${panels}  dots: ${dots}  kpi: ${kpi}`)
+  console.log(`nav      : ${navItems}  panels: ${panels}  dots: ${dots}  kpi: ${kpi}`)
   console.log(`console  : ${consoleErrors.length}` +
     (consoleErrors.length ? `  ${consoleErrors.slice(0, 3).join(' | ')}` : ''))
 
   const problems = []
   if (missing.length) problems.push(`missing markers: ${missing.join(', ')}`)
-  if (tabs < 6) problems.push(`expected >= 6 tabs, got ${tabs}`)
+  if (navItems < 6) problems.push(`expected >= 6 nav items, got ${navItems}`)
   if (panels < 4) problems.push(`expected >= 4 panels, got ${panels}`)
   if (dots < 4) problems.push(`expected >= 4 status lights, got ${dots}`)
   if (kpi < 4) problems.push(`expected >= 4 KPI cells, got ${kpi}`)
