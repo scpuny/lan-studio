@@ -182,6 +182,31 @@ pub fn list_interfaces() -> Vec<InterfaceInfo> {
     result
 }
 
+/// Interface name carrying the default IPv4 route.
+///
+/// `mdns.interface_mode = auto` joins multicast on the kernel-selected
+/// interface, so the console needs this name to tell the truth about which
+/// interface is actually taking part (F-A12). Returns `None` when `ip` is
+/// unavailable or no default route exists.
+pub fn default_interface() -> Option<String> {
+    let output = std::process::Command::new("ip")
+        .args(["-4", "route", "show", "default"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let mut tokens = line.split_whitespace();
+        while let Some(token) = tokens.next() {
+            if token == "dev" {
+                return tokens.next().map(|name| name.to_string());
+            }
+        }
+    }
+    None
+}
+
 fn list_interfaces_raw() -> Vec<InterfaceInfo> {
     let mut result = Vec::new();
     let output = match std::process::Command::new("ip")

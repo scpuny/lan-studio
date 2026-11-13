@@ -11,7 +11,7 @@
 | **M2.1** | 协议内核 + 配置内核 + mDNS 引擎 | `common-dns` 报文编解码、`common-config` 完整解析、`common-net` 组播收发、`lan-mdns` 真实应答/宣告/探针/摄取；离线报文单测 + 组播闭环 | **done** |
 | **M2.2** | 可观测 + 安全 + 配置生命周期 | 查询审计 / 冲突检测 / 服务地图 / 健康监控 / SSE / 日志轮转；配置保存·快照·回滚·导入导出·热重载；管理员密码与写保护；13 个专有指标族 | **done** |
 | **M2.3** | 告警 + HTTP 网关 + 部署运维 | `common-alert` 五平台适配 + 有界队列 / 冷却 / 重试、健康翻转与冲突触发；静态 Host 网关 + 双开关 + 友好页；Docker / compose / systemd / install.sh / 探针 / 首次启动模板 | **done** |
-| **M2.4** | WebUI + 全量销项 + DoD | 离线正式管理台、端到端与 API 契约测试、CI 门禁、66 条全部 `done`、PRD 8.1 组件级 DoD | pending |
+| **M2.4** | WebUI + 全量销项 + DoD | TypeScript 离线管理台（Vue 3 + Arco）、健康状态灯与列表、在线配置表单 + 源码双模式、网卡绑定页、服务导航；API 契约测试与 DoD 待收尾 | **进行中（65/66）** |
 
 ## 2. 66 条逐条销项
 
@@ -30,7 +30,7 @@
 | F-A09 | 退出时发送 Goodbye | M2.1 | done |
 | F-A10 | Known-Answer 抑制 / 缓存刷新 | M2.1 | done |
 | F-A11 | QU 位单播应答 | M2.1 | done |
-| F-A12 | 多网卡绑定（指定 / 自动 / 全部枚举） | M2.4 | pending |
+| F-A12 | 多网卡绑定（指定 / 自动 / 全部枚举） | M2.4 | done |
 
 ### B. 服务发现 DNS-SD（6）
 
@@ -61,7 +61,7 @@
 | F-D01 | 查询审计日志（时间 / 来源 / 名称 / 类型） | M2.2 | done |
 | F-D02 | 名称冲突检测（同名异值、来源登记、老化清理） | M2.2 | done |
 | F-D03 | 目标健康监控（TCP：up / down / unknown） | M2.2 | done |
-| F-D04 | 健康状态灯与列表 | M2.4 | pending |
+| F-D04 | 健康状态灯与列表 | M2.4 | done |
 | F-D05 | 实时日志流（SSE） | M2.2 | done |
 | F-D06 | 日志轮转与磁盘硬上界 | M2.2 | done |
 | F-D07 | 运行状态与统计 | M2.2 | done |
@@ -74,7 +74,7 @@
 | F-E01 | 声明式配置文件（符合 3.1） | M2.1 | done |
 | F-E02 | 离线配置校验（不启动网络） | M2.1 | done |
 | F-E03 | 配置热重载（文件变更 / 信号 / 手动） | M2.2 | done |
-| F-E04 | 在线配置编辑（表单 + 源码双模式） | M2.4 | pending |
+| F-E04 | 在线配置编辑（表单 + 源码双模式） | M2.4 | done |
 | F-E05 | 保存链路：校验 → 快照 → 原子替换 → 热重载 | M2.2 | done |
 | F-E06 | 配置版本快照（自动、有界、带原因标记） | M2.2 | done |
 | F-E07 | 一键回滚 | M2.2 | done |
@@ -109,7 +109,7 @@
 | F-H02 | 全局开关 + 每服务代理开关 | M2.3 | done |
 | F-H03 | 管理台统一域名入口 | M2.3 | done |
 | F-H04 | 友好错误页（未登记 / 目标不可达） | M2.3 | done |
-| F-H05 | 辅助跳转入口 | M2.4 | pending |
+| F-H05 | 辅助跳转入口 | M2.4 | done |
 
 ### I. 部署与运维（7）
 
@@ -131,8 +131,7 @@
 | F-J02 | 真实组播端到端测试 | M2.1 | done |
 | F-J03 | 管理 API 契约测试 + CI 门禁 | M2.4 | pending |
 
-**合计：10 个能力域 / 66 条；已销项 61 条（剩余 5 条归 M2.4：F-A12 / F-D04 /
-F-E04 / F-H05 / F-J03）。**
+**合计：10 个能力域 / 66 条；已销项 65 条（剩余 1 条：F-J03 API 契约运行态测试与 CI 门禁）。**
 
 ## 3. 契约端点对照（22 个，`contracts/openapi.yaml`）
 
@@ -344,9 +343,23 @@ M2.4 交付时明确提示，不伪装成热重载能力。
    更名 `run_cli`；`import http.server` 被 `def http()` 覆盖 → 改为
    `import http.server as httpserver`。
 
-### 7.5 M2.4 入口
+### 7.5 M2.4 交付记录
 
-剩余 5 条：`F-A12`（多网卡管理台表单）、`F-D04`（健康状态灯与列表）、
-`F-E04`（在线配置表单 + 源码双模式）、`F-H05`（管理台内辅助跳转入口）、
-`F-J03`（API 契约测试 + CI 门禁）。同时按 PRD 8.1 完成组件级 DoD 核对与
-66 条全部销项。技术取舍见 `docs/ADR/0004-m2-3-alerting-gateway-deploy.md`。
+管理台从占位页替换为 **Vue 3 + TypeScript（strict）+ Arco Design** 的六区域控制台，
+Vite 打包成单个自包含 HTML（803,808 字节）后由 `common-webui` 编入二进制。
+
+| 条目 | 验收证据 |
+| --- | --- |
+| `F-A12` | 配置页「网卡绑定」：`auto` / `all` / `specified` 三模式 + 地址列表；`/api/interfaces` 返回 `joined` / `mode` / `selected` / `default_interface` / `restart_required`，页面显式标注「需重启生效」；`common_net::default_interface()` 标记 `auto` 下真实参与的网卡 |
+| `F-D04` | 状态总览页：6 个状态灯（引擎 / 写保护 / 网关 / 告警 / 健康 / 冲突）+ 健康目标表（状态 / 别名 / 目标 / 延迟 / 最近检查），空态引导到配置页 |
+| `F-E04` | 配置页 8 个子 tab 表单 + 「源码模式」；双向切换（进源码按表单重生成、离开源码尝试回解析），保存走服务端离线校验并映射 `invalid_config` / `setup_required` / `auth_failed` |
+| `F-H05` | 状态总览页「服务导航」：已登记服务直达 / `/go/?host=` 跳转 / 复制地址，网关关闭时提示原因并保留直达 |
+| `F-J03` | **待交付** |
+
+验收（M2.4 批次）：`npm run typecheck` 0 error、`cargo test --workspace` **79 passed**、
+`scripts/verify_contracts.py` 21 passed、`scripts/smoke_mdns.py` **229 passed**、产物
+2,382,272 字节。设计取舍见 `docs/ADR/0005-m2-4-console-typescript.md`。
+
+**剩余 1 条**：`F-J03` 管理 API 契约运行态测试（`scripts/test_api_contract.py`：
+对 `openapi.yaml` 全部端点断言状态码 / 统一信封 / 错误码 / 鉴权矩阵）纳入 CI，
+随后按 PRD 8.1 完成组件级 DoD 核对并 66 条全部销项。

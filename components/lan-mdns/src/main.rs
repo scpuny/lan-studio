@@ -22,8 +22,8 @@ use common_alert::{AlertConfig, AlertEvent, DefaultSender, Dispatcher};
 use common_api::{err, json_quote, ok, App, Context, Request, Response, SseSpec};
 use common_auth::{PasswordGuard, PasswordManager};
 use common_config::{
-    apply_flat, config_path_from_env, get_bool, get_str, get_u32, get_u64, port_from_env,
-    validate_text, Config,
+    apply_flat, config_path_from_env, get_bool, get_str, get_u16, get_u32, get_u64, list_len,
+    port_from_env, validate_text, Config,
 };
 use common_dns::{
     type_name, validate_name, TYPE_A, TYPE_AAAA, TYPE_ANY, TYPE_PTR, TYPE_SRV, TYPE_TXT,
@@ -31,7 +31,7 @@ use common_dns::{
 use common_health::Health;
 use common_log::{EventSource, LogBuffer, RotatingFile};
 use common_metrics::Registry;
-use common_net::list_interfaces;
+use common_net::{default_interface, list_interfaces};
 use common_webui::INDEX_HTML;
 
 use config::MdnsConfig;
@@ -988,6 +988,122 @@ fn view_metrics(_: &Request, ctx: &Context) -> Response {
     )
 }
 
+/// Full typed view of the on-disk configuration (F-E04 form mode input).
+///
+/// The form never writes this structure back directly: it renders controls from
+/// it and then serialises the whole document to YAML text, so the single source
+/// of truth stays the raw text that `POST /api/config` validates offline.
+fn config_model_json(flat: &HashMap<String, String>) -> String {
+    let records: Vec<String> = (0..list_len(flat, "mdns.records"))
+        .map(|index| {
+            let base = format!("mdns.records[{}]", index);
+            format!(
+                "{{\"name\":{},\"type\":{},\"value\":{},\"ttl\":{}}}",
+                json_quote(&get_str(flat, &format!("{}.name", base), "")),
+                json_quote(&get_str(flat, &format!("{}.type", base), "A")),
+                json_quote(&get_str(flat, &format!("{}.value", base), "")),
+                get_u32(flat, &format!("{}.ttl", base), 0)
+            )
+        })
+        .collect();
+
+    let services: Vec<String> = (0..list_len(flat, "mdns.services"))
+        .map(|index| {
+            let base = format!("mdns.services[{}]", index);
+            let txt_prefix = format!("{}.txt.", base);
+            let mut txt: Vec<String> = flat
+                .iter()
+                .filter_map(|(key, value)| {
+                    key.strip_prefix(&txt_prefix)
+                        .map(|name| format!("{}={}", name, value))
+                })
+                .collect();
+            txt.sort();
+            format!(
+                "{{\"instance\":{},\"type\":{},\"host\":{},\"port\":{},\"proxy\":{},\"txt\":{}}}",
+                json_quote(&get_str(flat, &format!("{}.instance", base), "")),
+                json_quote(&get_str(flat, &format!("{}.type", base), "")),
+                json_quote(&get_str(flat, &format!("{}.host", base), "")),
+                get_u16(flat, &format!("{}.port", base), 80),
+                get_bool(flat, &format!("{}.proxy", base), true),
+                json_str_array(&txt)
+            )
+        })
+        .collect();
+
+    let targets: Vec<String> = (0..list_len(flat, "mdns.health_targets"))
+        .map(|index| {
+            let base = format!("mdns.health_targets[{}]", index);
+            format!(
+                "{{\"alias\":{},\"host\":{},\"port\":{}}}",
+                json_quote(&get_str(flat, &format!("{}.alias", base), "")),
+                json_quote(&get_str(flat, &format!("{}.host", base), "")),
+                get_u16(flat, &format!("{}.port", base), 0)
+            )
+        })
+        .collect();
+
+    let hosts: Vec<String> = (0..list_len(flat, "mdns.gateway.hosts"))
+        .map(|index| {
+            let base = format!("mdns.gateway.hosts[{}]", index);
+            format!(
+                "{{\"host\":{},\"target\":{},\"proxy\":{}}}",
+                json_quote(&get_str(flat, &format!("{}.host", base), "")),
+                json_quote(&get_str(flat, &format!("{}.target", base), "")),
+                get_bool(flat, &format!("{}.proxy", base), true)
+            )
+        })
+        .collect();
+
+    let webhooks: Vec<String> = (0..list_len(flat, "alerts.webhooks"))
+        .map(|index| json_quote(&get_str(flat, &format!("alerts.webhooks[{}]", index), "")))
+        .collect();
+
+    let interfaces: Vec<String> = (0..list_len(flat, "mdns.interfaces"))
+        .map(|index| json_quote(&get_str(flat, &format!("mdns.interfaces[{}]", index), "")))
+        .collect();
+
+    format!(
+        "{{\"version\":{},\"component\":{},\"server\":{{\"listen\":{},\"port\":{},\"webui\":{},\"admin_token_set\":{},\"log_level\":{}}},\"observability\":{{\"metrics\":{},\"alerts\":{},\"history_limit\":{}}},\"logging\":{{\"max_bytes\":{},\"backup_count\":{},\"level\":{}}},\"alerts\":{{\"enabled\":{},\"webhooks\":[{}],\"cooldown_seconds\":{},\"timeout_seconds\":{},\"max_retries\":{}}},\"mdns\":{{\"group\":{},\"port\":{},\"ttl\":{},\"announce_count\":{},\"announce_interval_ms\":{},\"announce_period_s\":{},\"reverse_ptr\":{},\"interface_mode\":{},\"interfaces\":[{}],\"records\":[{}],\"services\":[{}],\"health_targets\":[{}],\"gateway\":{{\"enabled\":{},\"port\":{},\"listen\":{},\"admin_host\":{},\"timeout_seconds\":{},\"hosts\":[{}]}}}}}}",
+        get_u32(flat, "version", 1),
+        json_quote(&get_str(flat, "component", "")),
+        json_quote(&get_str(flat, "server.listen", "127.0.0.1")),
+        get_u16(flat, "server.port", 8080),
+        get_bool(flat, "server.webui", true),
+        !get_str(flat, "server.admin_token", "").is_empty(),
+        json_quote(&get_str(flat, "server.log_level", "info")),
+        get_bool(flat, "observability.metrics", true),
+        get_bool(flat, "observability.alerts", true),
+        get_u32(flat, "observability.history_limit", 30),
+        get_u64(flat, "logging.max_bytes", 1_048_576),
+        get_u32(flat, "logging.backup_count", 3),
+        json_quote(&get_str(flat, "logging.level", "info")),
+        get_bool(flat, "alerts.enabled", true),
+        webhooks.join(","),
+        get_u32(flat, "alerts.cooldown_seconds", 300),
+        get_str(flat, "alerts.timeout_seconds", "5.0"),
+        get_u32(flat, "alerts.max_retries", 2),
+        json_quote(&get_str(flat, "mdns.group", "224.0.0.251")),
+        get_u16(flat, "mdns.port", 5353),
+        get_u32(flat, "mdns.ttl", 120),
+        get_u32(flat, "mdns.announce_count", 3),
+        get_u64(flat, "mdns.announce_interval_ms", 250),
+        get_u64(flat, "mdns.announce_period_s", 60),
+        get_bool(flat, "mdns.reverse_ptr", true),
+        json_quote(&get_str(flat, "mdns.interface_mode", "auto")),
+        interfaces.join(","),
+        records.join(","),
+        services.join(","),
+        targets.join(","),
+        get_bool(flat, "mdns.gateway.enabled", false),
+        get_u16(flat, "mdns.gateway.port", 80),
+        json_quote(&get_str(flat, "mdns.gateway.listen", "0.0.0.0")),
+        json_quote(&get_str(flat, "mdns.gateway.admin_host", "mdns.local")),
+        get_str(flat, "mdns.gateway.timeout_seconds", "6.0"),
+        hosts.join(",")
+    )
+}
+
 fn view_config(req: &Request, _: &Context) -> Response {
     let state = match state_or_503(req) {
         Ok(state) => state,
@@ -995,23 +1111,13 @@ fn view_config(req: &Request, _: &Context) -> Response {
     };
     let raw = state.store.raw();
     let structured = match validate_text(&raw) {
-        Ok(flat) => {
-            let cfg = Config {
-                raw: raw.clone(),
-                ..Config::default()
-            };
-            let mut cfg = cfg;
-            apply_flat(&mut cfg, &flat);
-            format!(
-                "{{\"component\":{},\"listen\":{},\"port\":{},\"webui\":{},\"token_required\":{}}}",
-                json_quote(&cfg.component),
-                json_quote(&cfg.listen),
-                cfg.port,
-                cfg.webui,
-                !cfg.admin_token.is_empty(),
-            )
-        }
-        Err(_) => "null".to_string(),
+        Ok(flat) => config_model_json(&flat),
+        Err(error) => format!(
+            "{{\"invalid\":true,\"code\":{},\"field\":{},\"detail\":{}}}",
+            json_quote(error.code),
+            json_quote(&error.field),
+            json_quote(&error.detail)
+        ),
     };
     ok(
         req,
@@ -1355,13 +1461,35 @@ fn view_records(req: &Request, _: &Context) -> Response {
 }
 
 fn view_interfaces(req: &Request, _: &Context) -> Response {
+    // F-A12: report the configured mode, the addresses actually joined to the
+    // group, and which enumerated interface currently takes part. Changing the
+    // interface set rebuilds the multicast socket, so it is explicitly NOT
+    // hot-reloadable — the console shows restart_required instead of pretending.
+    let (mode, selected) = match ENGINE.get() {
+        Some(engine) => {
+            let cfg = engine.config();
+            let selected: Vec<String> =
+                cfg.interfaces.iter().map(|addr| addr.to_string()).collect();
+            (cfg.interface_mode.clone(), selected)
+        }
+        None => (String::from("auto"), Vec::new()),
+    };
+    let default_dev = default_interface();
     let items: Vec<String> = list_interfaces()
         .iter()
         .map(|info| {
+            let addr = info.addr.to_string();
+            let joined = match mode.as_str() {
+                "all" => true,
+                "specified" => selected.iter().any(|item| item == &addr),
+                // `auto` joins on the kernel-selected interface only.
+                _ => default_dev.as_deref() == Some(info.name.as_str()),
+            };
             format!(
-                "{{\"name\":{},\"addr\":{}}}",
+                "{{\"name\":{},\"addr\":{},\"joined\":{}}}",
                 json_quote(&info.name),
-                json_quote(&info.addr.to_string())
+                json_quote(&addr),
+                joined
             )
         })
         .collect();
@@ -1369,9 +1497,15 @@ fn view_interfaces(req: &Request, _: &Context) -> Response {
     ok(
         req,
         &format!(
-            "{{\"interfaces\":[{}],\"total\":{}}}",
+            "{{\"interfaces\":[{}],\"total\":{},\"mode\":{},\"selected\":{},\"default_interface\":{},\"restart_required\":true}}",
             items.join(","),
-            total
+            total,
+            json_quote(&mode),
+            json_str_array(&selected),
+            match &default_dev {
+                Some(name) => json_quote(name),
+                None => "null".to_string(),
+            }
         ),
     )
 }

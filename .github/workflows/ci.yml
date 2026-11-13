@@ -7,6 +7,44 @@ on:
     branches: [main]
 
 jobs:
+  webui:
+    name: WebUI (typescript + offline bundle)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: components/lan-mdns/webui
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: components/lan-mdns/webui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check (vue-tsc, strict)
+        run: npm run typecheck
+
+      - name: Build single-file console
+        run: npx vite build
+
+      - name: Assert bundle is self-contained
+        run: |
+          set -e
+          OUT=../../../common/webui/src/assets/index.html
+          grep -q '<style' "$OUT"
+          for pat in '<script src=' 'src="http://' 'src="https://' 'href="http://' 'href="https://' 'url(http://' 'url(https://'; do
+            if grep -qF "$pat" "$OUT"; then
+              echo "offline asset rule violated: $pat"
+              exit 1
+            fi
+          done
+          echo "bundle bytes: $(stat -c %s "$OUT")"
+
   verify:
     runs-on: ubuntu-latest
     steps:

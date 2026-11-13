@@ -1,0 +1,358 @@
+/* Design tokens. Colors come from Arco so both themes stay in sync (PRD 3.7). */
+:root {
+  --ls-gap: 16px;
+  --ls-gap-sm: 10px;
+  --ls-radius: 10px;
+  --ls-radius-sm: 6px;
+  --ls-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans CJK SC',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --ls-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --ls-up: #00b42a;
+  --ls-down: #f53f3f;
+  --ls-unknown: #86909c;
+  --ls-warn: #ff7d00;
+  --ls-surface: var(--color-bg-2);
+  --ls-surface-soft: var(--color-fill-1);
+  --ls-border: var(--color-border-2);
+  --ls-text: var(--color-text-1);
+  --ls-text-soft: var(--color-text-3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--color-bg-1);
+  color: var(--ls-text);
+  font-family: var(--ls-font);
+  font-size: 14px;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.ls-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-gap);
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--ls-border);
+  background: var(--ls-surface);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-wrap: wrap;
+}
+
+.ls-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.ls-brand small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ls-text-soft);
+  font-family: var(--ls-mono);
+}
+
+.ls-header-spacer {
+  flex: 1;
+}
+
+.ls-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-gap);
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ls-text-soft);
+}
+
+.ls-body {
+  padding: 18px 22px 48px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.ls-grid {
+  display: grid;
+  gap: var(--ls-gap);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.ls-panel {
+  border: 1px solid var(--ls-border);
+  border-radius: var(--ls-radius);
+  background: var(--ls-surface);
+  padding: var(--ls-gap);
+}
+
+.ls-panel + .ls-panel {
+  margin-top: var(--ls-gap);
+}
+
+.ls-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.ls-panel-title .ls-hint {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--ls-text-soft);
+}
+
+.ls-kpi-label {
+  font-size: 12px;
+  color: var(--ls-text-soft);
+  margin-bottom: 6px;
+}
+
+.ls-kpi-value {
+  font-size: 22px;
+  font-weight: 600;
+  font-family: var(--ls-mono);
+  line-height: 1.2;
+}
+
+.ls-kpi-value.small {
+  font-size: 15px;
+}
+
+.ls-kpi-foot {
+  font-size: 12px;
+  color: var(--ls-text-soft);
+  margin-top: 4px;
+}
+
+/* Status lights: constant breathing only, no entrance animation on refresh. */
+.ls-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--ls-unknown);
+  flex: none;
+}
+
+.ls-dot.is-up {
+  background: var(--ls-up);
+  animation: ls-breathe-up 2.6s ease-in-out infinite;
+}
+
+.ls-dot.is-down {
+  background: var(--ls-down);
+  animation: ls-breathe-down 1.8s ease-in-out infinite;
+}
+
+.ls-dot.is-warn {
+  background: var(--ls-warn);
+}
+
+.ls-dot.is-unknown {
+  background: var(--ls-unknown);
+}
+
+@keyframes ls-breathe-up {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 180, 42, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(0, 180, 42, 0);
+  }
+}
+
+@keyframes ls-breathe-down {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 63, 63, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(245, 63, 63, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-dot {
+    animation: none !important;
+  }
+}
+
+.ls-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ls-mono {
+  font-family: var(--ls-mono);
+  font-size: 12.5px;
+}
+
+.ls-muted {
+  color: var(--ls-text-soft);
+}
+
+.ls-row {
+  display: flex;
+  gap: var(--ls-gap-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ls-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.ls-field > label {
+  font-size: 12px;
+  color: var(--ls-text-soft);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ls-field-grid {
+  display: grid;
+  gap: 0 var(--ls-gap);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.ls-code {
+  width: 100%;
+  min-height: 420px;
+  padding: 12px;
+  border-radius: var(--ls-radius-sm);
+  border: 1px solid var(--ls-border);
+  background: var(--ls-surface-soft);
+  color: var(--ls-text);
+  font-family: var(--ls-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  tab-size: 2;
+}
+
+.ls-code:focus {
+  border-color: rgb(var(--primary-6));
+}
+
+.ls-log {
+  height: 460px;
+  overflow: auto;
+  border: 1px solid var(--ls-border);
+  border-radius: var(--ls-radius-sm);
+  background: var(--ls-surface-soft);
+  padding: 10px 12px;
+  font-family: var(--ls-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ls-log-line {
+  padding: 1px 0;
+  border-bottom: 1px solid transparent;
+}
+
+.ls-log-time {
+  color: var(--ls-text-soft);
+  margin-right: 8px;
+}
+
+.ls-tag-level {
+  display: inline-block;
+  min-width: 52px;
+  margin-right: 8px;
+  font-weight: 600;
+}
+
+.ls-level-error {
+  color: var(--ls-down);
+}
+
+.ls-level-warning {
+  color: var(--ls-warn);
+}
+
+.ls-level-info {
+  color: rgb(var(--primary-6));
+}
+
+.ls-level-debug {
+  color: var(--ls-unknown);
+}
+
+.ls-empty {
+  padding: 28px 0;
+}
+
+.ls-note {
+  font-size: 12px;
+  color: var(--ls-text-soft);
+  line-height: 1.7;
+}
+
+.ls-stack > * + * {
+  margin-top: var(--ls-gap-sm);
+}
+
+.ls-two-col {
+  display: grid;
+  gap: var(--ls-gap);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+@media (max-width: 1080px) {
+  .ls-two-col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ls-body {
+    padding: 14px 12px 40px;
+  }
+}
+
+.ls-service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ls-gap-sm);
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--ls-border);
+}
+
+.ls-service-row:last-child {
+  border-bottom: none;
+}
+
+.ls-service-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ls-cert {
+  font-size: 12px;
+  color: var(--ls-text-soft);
+  font-family: var(--ls-mono);
+}

@@ -374,7 +374,12 @@ def main():
         ifaces = body.get("data", {}).get("interfaces", [])
         check("/api/interfaces 200", status == 200)
         check("at least one interface", len(ifaces) >= 1)
-        check("interface shape", all("name" in i and "addr" in i for i in ifaces))
+        check("interface shape",
+              all("name" in i and "addr" in i and "joined" in i for i in ifaces))
+        check("F-A12 binding mode is reported",
+              body.get("data", {}).get("mode") in ("auto", "all", "specified"))
+        check("F-A12 interface changes require a restart",
+              body.get("data", {}).get("restart_required") is True)
 
         status, headers, raw = http("GET", "/api/metrics")
         check("/api/metrics 200", status == 200)
@@ -455,14 +460,25 @@ def main():
               all("name" in e and "qtype" in e and "source" in e
                   for e in body.get("data", {}).get("queries", [])))
 
-        status, _, raw = http("GET", "/")
+        status, headers, raw = http("GET", "/")
         check("WebUI 200", status == 200)
+        check("WebUI is served as html", "text/html" in headers.get("Content-Type", ""))
         check("WebUI contains Lan Studio", "Lan Studio" in raw)
+        # M2.4: the pane ships as the compiled Vue + TypeScript + Arco bundle,
+        # inlined into a single file by vite-plugin-singlefile.
+        check("WebUI mounts the Vue app", 'id="app"' in raw)
+        check("WebUI styles are inlined", "<style" in raw)
+        check("WebUI has no external script/link",
+              not any(p in raw for p in ('<script src=', '<link rel="stylesheet"')))
+        check("WebUI ships the console panes",
+              all(k in raw for k in ("配置管理", "版本历史", "告警设置")))
 
         status, _, raw = http("GET", "/api/config")
         check("/api/config 200", status == 200)
         check("config raw is the YAML",
               "component: lan-mdns" in data_of(raw).get("raw", ""))
+        check("/api/config exposes a structured projection",
+              isinstance(data_of(raw).get("structured"), dict))
 
         status, _, raw = http("GET", "/api/auth")
         check("/api/auth 200", status == 200)

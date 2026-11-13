@@ -113,7 +113,18 @@ pub fn parse_flat(text: &str) -> HashMap<String, String> {
                 frame.next_index += 1;
                 format!("{}[{}]", frame.prefix, index)
             };
-            if let Some((key, value)) = item.split_once(':') {
+            // Only treat `- something` as a mapping when it really looks like
+            // `key: value`. A bare scalar such as `- "https://host/path"` would
+            // otherwise be split at the first `:` inside the URL and stored as
+            // `prefix[0].https`, silently dropping the value (F-G05 / F-E04).
+            let mapping = item.split_once(':').filter(|(key, rest)| {
+                let key_ok = !key.is_empty()
+                    && key.chars().all(|ch| {
+                        ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.'
+                    });
+                key_ok && (rest.is_empty() || rest.starts_with(' '))
+            });
+            if let Some((key, value)) = mapping {
                 let full = format!("{}.{}", item_prefix, key.trim());
                 if value.trim().is_empty() {
                     stack.push(Frame {
@@ -389,6 +400,28 @@ mdns:
         let flat = parse_flat("alerts:\n  webhooks: []\nmdns:\n  interfaces: []\n");
         assert_eq!(flat.get("alerts.webhooks").unwrap(), "");
         assert_eq!(list_len(&flat, "mdns.interfaces"), 0);
+    }
+
+    #[test]
+    fn scalar_list_items_keep_urls_intact() {
+        // A `- "https://..."` entry contains a colon; it must stay one scalar,
+        // not become `prefix[0].https = "//..."`.
+        let flat = parse_flat(
+            "alerts:\n  webhooks:\n    - \"https://oapi.dingtalk.com/robot/send?access_token=abc\"\n    - http://127.0.0.1:9000/hook\n",
+        );
+        assert_eq!(list_len(&flat, "alerts.webhooks"), 2);
+        assert_eq!(
+            flat.get("alerts.webhooks[0]").unwrap(),
+            "https://oapi.dingtalk.com/robot/send?access_token=abc"
+        );
+        assert_eq!(
+            flat.get("alerts.webhooks[1]").unwrap(),
+            "http://127.0.0.1:9000/hook"
+        );
+        // Object list items still parse as mappings.
+        let flat = parse_flat("mdns:\n  records:\n    - name: nas.local\n      type: A\n");
+        assert_eq!(flat.get("mdns.records[0].name").unwrap(), "nas.local");
+        assert_eq!(flat.get("mdns.records[0].type").unwrap(), "A");
     }
 
     #[test]
