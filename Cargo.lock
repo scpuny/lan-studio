@@ -3,6 +3,10 @@
 version = 3
 
 [[package]]
+name = "common-alert"
+version = "0.1.0"
+
+[[package]]
 name = "common-api"
 version = "0.1.0"
 dependencies = [
@@ -55,6 +59,7 @@ version = "0.1.0"
 name = "lan-mdns"
 version = "0.1.0"
 dependencies = [
+ "common-alert",
  "common-api",
  "common-auth",
  "common-config",

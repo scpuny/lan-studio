@@ -38,3 +38,10 @@ mdns:
   health_targets: []
   records: []
   services: []
+  gateway:
+    enabled: false
+    port: 80
+    listen: "0.0.0.0"
+    admin_host: "mdns.local"
+    timeout_seconds: 6.0
+    hosts: []

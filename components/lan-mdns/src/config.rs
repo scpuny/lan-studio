@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
+use std::time::Duration;
 
 use common_config::{get_bool, get_str, get_u16, get_u32, get_u64, list_len, ConfigError};
 use common_dns::{
@@ -51,6 +52,28 @@ pub struct ServiceDef {
     pub host: String,
     pub port: u16,
     pub txt: Vec<String>,
+    /// F-H02 per-service gateway switch; only consulted when the global
+    /// `mdns.gateway.enabled` switch is on.
+    pub proxy: bool,
+}
+
+/// One static Host -> `ip:port` gateway route (PRD 1.4: no dynamic routing).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GatewayRoute {
+    pub host: String,
+    pub target: String,
+    pub proxy: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GatewayConfig {
+    /// Global switch. Off means **no listener is created at all** (F-H02).
+    pub enabled: bool,
+    pub port: u16,
+    pub listen: String,
+    pub admin_host: String,
+    pub timeout: Duration,
+    pub routes: Vec<GatewayRoute>,
 }
 
 /// TCP business health target (F-D03). `alias` is optional and, when present,
@@ -76,6 +99,7 @@ pub struct MdnsConfig {
     pub records: Vec<RecordDef>,
     pub services: Vec<ServiceDef>,
     pub health_targets: Vec<HealthTargetDef>,
+    pub gateway: GatewayConfig,
 }
 
 impl MdnsConfig {
@@ -200,12 +224,14 @@ impl MdnsConfig {
                 })
                 .collect();
             txt.sort();
+            let proxy = get_bool(flat, &format!("{}.proxy", base), true);
             services.push(ServiceDef {
                 instance,
                 service_type,
                 host,
                 port: service_port,
                 txt,
+                proxy,
             });
         }
 
@@ -239,6 +265,76 @@ impl MdnsConfig {
             return Err(error("mdns.health_targets", "at most 64 targets"));
         }
 
+        // ---- F-H01..F-H03: static Host gateway ---------------------------
+        let gateway_enabled = get_bool(flat, "mdns.gateway.enabled", false);
+        let gateway_port = get_u16(flat, "mdns.gateway.port", 80);
+        if gateway_port == 0 {
+            return Err(error("mdns.gateway.port", "must be 1..65535"));
+        }
+        let gateway_listen = get_str(flat, "mdns.gateway.listen", "0.0.0.0");
+        let gateway_admin_host =
+            get_str(flat, "mdns.gateway.admin_host", "mdns.local").to_ascii_lowercase();
+        let timeout_text = get_str(flat, "mdns.gateway.timeout_seconds", "6.0");
+        let timeout_value: f64 = timeout_text
+            .parse()
+            .map_err(|_| error("mdns.gateway.timeout_seconds", "must be a number"))?;
+        if !timeout_value.is_finite() || timeout_value <= 0.0 || timeout_value > 60.0 {
+            return Err(error("mdns.gateway.timeout_seconds", "must be in (0, 60]"));
+        }
+
+        let mut routes: Vec<GatewayRoute> = Vec::new();
+        // A published service is automatically a registered gateway name when
+        // its host resolves to one of our own A records. PRD 1.4: no other
+        // names are ever routable.
+        for service in &services {
+            let address = records.iter().find_map(|record| {
+                (record.rtype == TYPE_A && record.name.eq_ignore_ascii_case(&service.host))
+                    .then(|| record.value.clone())
+            });
+            if let Some(address) = address {
+                routes.push(GatewayRoute {
+                    host: service.host.to_ascii_lowercase(),
+                    target: format!("{}:{}", address, service.port),
+                    proxy: service.proxy,
+                });
+            }
+        }
+        for index in 0..list_len(flat, "mdns.gateway.hosts") {
+            let base = format!("mdns.gateway.hosts[{}]", index);
+            let host = get_str(flat, &format!("{}.host", base), "").to_ascii_lowercase();
+            let target = get_str(flat, &format!("{}.target", base), "");
+            let proxy = get_bool(flat, &format!("{}.proxy", base), true);
+            if host.is_empty() || target.is_empty() {
+                return Err(error(&base, "host and target are required"));
+            }
+            let valid_target = target
+                .rsplit_once(':')
+                .is_some_and(|(head, port)| !head.is_empty() && port.parse::<u16>().is_ok());
+            if !valid_target {
+                return Err(error(&format!("{}.target", base), "expected host:port"));
+            }
+            let entry = GatewayRoute {
+                host: host.clone(),
+                target,
+                proxy,
+            };
+            match routes.iter_mut().find(|route| route.host == host) {
+                Some(existing) => *existing = entry,
+                None => routes.push(entry),
+            }
+        }
+        if routes.len() > 256 {
+            return Err(error("mdns.gateway.hosts", "at most 256 routes"));
+        }
+        let gateway = GatewayConfig {
+            enabled: gateway_enabled,
+            port: gateway_port,
+            listen: gateway_listen,
+            admin_host: gateway_admin_host,
+            timeout: Duration::from_millis((timeout_value * 1000.0) as u64),
+            routes,
+        };
+
         Ok(Self {
             group,
             port,
@@ -252,6 +348,7 @@ impl MdnsConfig {
             records,
             services,
             health_targets,
+            gateway,
         })
     }
 
@@ -437,5 +534,93 @@ mdns:
             assert_eq!(err.code, "invalid_config");
             assert_eq!(err.field, field);
         }
+    }
+
+    #[test]
+    fn gateway_is_off_by_default_and_derives_routes_from_services() {
+        let cfg = MdnsConfig::from_flat(&parse_flat(TEMPLATE)).unwrap();
+        assert!(
+            !cfg.gateway.enabled,
+            "global switch must default to off (F-H02)"
+        );
+        assert_eq!(cfg.gateway.port, 80);
+        assert_eq!(cfg.gateway.admin_host, "mdns.local");
+        assert_eq!(cfg.gateway.routes.len(), 1);
+        assert_eq!(cfg.gateway.routes[0].host, "nas.local");
+        assert_eq!(cfg.gateway.routes[0].target, "192.168.5.10:8080");
+        assert!(cfg.gateway.routes[0].proxy);
+    }
+
+    #[test]
+    fn explicit_hosts_override_and_per_service_switch() {
+        let text = "\
+version: 1
+component: lan-mdns
+mdns:
+  records:
+    - name: nas.local
+      type: A
+      value: 192.168.5.10
+  services:
+    - instance: Web
+      type: _http._tcp.local
+      host: nas.local
+      port: 8080
+      proxy: false
+    - instance: Box
+      type: _http._tcp.local
+      host: box.local
+      port: 9000
+  gateway:
+    enabled: true
+    port: 8081
+    admin_host: Console.LOCAL
+    timeout_seconds: 2.5
+    hosts:
+      - host: NAS.local
+        target: \"192.168.5.99:80\"
+        proxy: true
+      - host: printer.local
+        target: \"192.168.5.30:631\"
+";
+        let cfg = MdnsConfig::from_flat(&parse_flat(text)).unwrap();
+        assert!(cfg.gateway.enabled);
+        assert_eq!(cfg.gateway.port, 8081);
+        assert_eq!(cfg.gateway.admin_host, "console.local");
+        assert_eq!(cfg.gateway.timeout, Duration::from_millis(2500));
+        // nas.local (derived) is overridden by the explicit entry, and
+        // printer.local is added: 2 routes, not 3.
+        assert_eq!(cfg.gateway.routes.len(), 2);
+        assert!(cfg
+            .gateway
+            .routes
+            .iter()
+            .any(|route| route.host == "printer.local"));
+        let nas = cfg
+            .gateway
+            .routes
+            .iter()
+            .find(|route| route.host == "nas.local")
+            .unwrap();
+        assert_eq!(nas.target, "192.168.5.99:80", "explicit host must win");
+        assert!(nas.proxy, "explicit entry re-enables a disabled service");
+        // box.local has no A record, so it must NOT become a route (PRD 1.4).
+        assert!(!cfg.gateway.routes.iter().any(|r| r.host == "box.local"));
+        assert!(!cfg.services[0].proxy, "per-service switch is parsed");
+    }
+
+    #[test]
+    fn gateway_target_and_timeout_are_validated_offline() {
+        let base = "version: 1\ncomponent: lan-mdns\nmdns:\n  gateway:\n    enabled: true\n";
+        let bad_target = format!(
+            "{}    hosts:\n      - host: nas.local\n        target: not-a-socket\n",
+            base
+        );
+        let err = MdnsConfig::from_flat(&parse_flat(&bad_target)).unwrap_err();
+        assert_eq!(err.field, "mdns.gateway.hosts[0].target");
+
+        let bad_timeout = format!("{}    timeout_seconds: 0\n", base);
+        let err = MdnsConfig::from_flat(&parse_flat(&bad_timeout)).unwrap_err();
+        assert_eq!(err.field, "mdns.gateway.timeout_seconds");
     }
 }

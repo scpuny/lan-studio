@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | **M2.1** | 协议内核 + 配置内核 + mDNS 引擎 | `common-dns` 报文编解码、`common-config` 完整解析、`common-net` 组播收发、`lan-mdns` 真实应答/宣告/探针/摄取；离线报文单测 + 组播闭环 | **done** |
 | **M2.2** | 可观测 + 安全 + 配置生命周期 | 查询审计 / 冲突检测 / 服务地图 / 健康监控 / SSE / 日志轮转；配置保存·快照·回滚·导入导出·热重载；管理员密码与写保护；13 个专有指标族 | **done** |
-| **M2.3** | 告警 + HTTP 网关 + 部署运维 | 多平台 Webhook + 冷却重试；静态 Host 网关 + 友好页；Docker / compose / systemd / install.sh / 探针 | pending |
+| **M2.3** | 告警 + HTTP 网关 + 部署运维 | `common-alert` 五平台适配 + 有界队列 / 冷却 / 重试、健康翻转与冲突触发；静态 Host 网关 + 双开关 + 友好页；Docker / compose / systemd / install.sh / 探针 / 首次启动模板 | **done** |
 | **M2.4** | WebUI + 全量销项 + DoD | 离线正式管理台、端到端与 API 契约测试、CI 门禁、66 条全部 `done`、PRD 8.1 组件级 DoD | pending |
 
 ## 2. 66 条逐条销项
@@ -49,7 +49,7 @@
 | --- | --- | --- | --- |
 | F-C01 | 标准组播地址与端口收发 | M2.1 | done |
 | F-C02 | 组播地址 / 端口可配置（隔离测试） | M2.1 | done |
-| F-C03 | 与系统 mDNS 守护进程共存 | M2.3 | pending |
+| F-C03 | 与系统 mDNS 守护进程共存 | M2.3 | done |
 | F-C04 | 自身应答回环排除 | M2.1 | done |
 | F-C05 | DNS 报文编解码（含名称压缩） | M2.1 | done |
 | F-C06 | 全链路有界资源 | M2.2 | done |
@@ -79,7 +79,7 @@
 | F-E06 | 配置版本快照（自动、有界、带原因标记） | M2.2 | done |
 | F-E07 | 一键回滚 | M2.2 | done |
 | F-E08 | 配置导入 / 导出 | M2.2 | done |
-| F-E09 | 首次启动模板生成 + 配置持久化 | M2.3 | pending |
+| F-E09 | 首次启动模板生成 + 配置持久化 | M2.3 | done |
 
 ### F. 安全（5）
 
@@ -95,33 +95,33 @@
 
 | 编号 | 能力 | 批次 | 状态 |
 | --- | --- | --- | --- |
-| F-G01 | 多平台 Webhook（钉钉 / 飞书 / Slack / 企业微信 / 通用 JSON） | M2.3 | pending |
-| F-G02 | 健康状态翻转触发 | M2.3 | pending |
-| F-G03 | 名称冲突触发 | M2.3 | pending |
-| F-G04 | 冷却去重 + 失败重试（≤2 次）+ 有界队列 | M2.3 | pending |
-| F-G05 | 告警配置热更新与状态查询 | M2.3 | pending |
+| F-G01 | 多平台 Webhook（钉钉 / 飞书 / Slack / 企业微信 / 通用 JSON） | M2.3 | done |
+| F-G02 | 健康状态翻转触发 | M2.3 | done |
+| F-G03 | 名称冲突触发 | M2.3 | done |
+| F-G04 | 冷却去重 + 失败重试（≤2 次）+ 有界队列 | M2.3 | done |
+| F-G05 | 告警配置热更新与状态查询 | M2.3 | done |
 
 ### H. 网关与辅助入口（5）
 
 | 编号 | 能力 | 批次 | 状态 |
 | --- | --- | --- | --- |
-| F-H01 | 内置 HTTP 网关（已登记域名静态 Host 路由） | M2.3 | pending |
-| F-H02 | 全局开关 + 每服务代理开关 | M2.3 | pending |
-| F-H03 | 管理台统一域名入口 | M2.3 | pending |
-| F-H04 | 友好错误页（未登记 / 目标不可达） | M2.3 | pending |
+| F-H01 | 内置 HTTP 网关（已登记域名静态 Host 路由） | M2.3 | done |
+| F-H02 | 全局开关 + 每服务代理开关 | M2.3 | done |
+| F-H03 | 管理台统一域名入口 | M2.3 | done |
+| F-H04 | 友好错误页（未登记 / 目标不可达） | M2.3 | done |
 | F-H05 | 辅助跳转入口 | M2.4 | pending |
 
 ### I. 部署与运维（7）
 
 | 编号 | 能力 | 批次 | 状态 |
 | --- | --- | --- | --- |
-| F-I01 | 单文件发布、零外部运行时依赖 | M2.3 | pending |
-| F-I02 | `webui` / `cli` 双模式 | M2.3 | pending |
-| F-I03 | 容器镜像 + 编排文件（host 网络硬约束） | M2.3 | pending |
-| F-I04 | 系统服务单元 | M2.3 | pending |
-| F-I05 | 一键安装脚本 + 升级（保留配置与日志） | M2.3 | pending |
-| F-I06 | 数据卷持久化 | M2.3 | pending |
-| F-I07 | 健康检查探针 | M2.3 | pending |
+| F-I01 | 单文件发布、零外部运行时依赖 | M2.3 | done |
+| F-I02 | `webui` / `cli` 双模式 | M2.3 | done |
+| F-I03 | 容器镜像 + 编排文件（host 网络硬约束） | M2.3 | done |
+| F-I04 | 系统服务单元 | M2.3 | done |
+| F-I05 | 一键安装脚本 + 升级（保留配置与日志） | M2.3 | done |
+| F-I06 | 数据卷持久化 | M2.3 | done |
+| F-I07 | 健康检查探针 | M2.3 | done |
 
 ### J. 质量保障（3）
 
@@ -131,7 +131,8 @@
 | F-J02 | 真实组播端到端测试 | M2.1 | done |
 | F-J03 | 管理 API 契约测试 + CI 门禁 | M2.4 | pending |
 
-**合计：10 个能力域 / 66 条；已销项 43 条。**
+**合计：10 个能力域 / 66 条；已销项 61 条（剩余 5 条归 M2.4：F-A12 / F-D04 /
+F-E04 / F-H05 / F-J03）。**
 
 ## 3. 契约端点对照（22 个，`contracts/openapi.yaml`）
 
@@ -140,7 +141,7 @@
 | M1 已有 | `/healthz`、`/readyz`、`/api/status`、`/api/metrics`、`/api/config`(GET)、`/api/auth` |
 | M2.1（已交付） | `/api/records`、`/api/probe`、`/api/interfaces`；额外提前提供只读的 `/api/queries`、`/api/browse` |
 | M2.2（已交付） | `/api/config`(POST)、`/api/config/snapshot`(GET/POST)、`/api/config/history`、`/api/config/rollback`、`/api/reload`、`/api/logs`、`/api/logs/stream`、`/api/health/targets`、`/api/conflicts`、`/api/auth/password`、`/api/auth/verify`；`/api/queries` 补 CSV 导出与老化、`/api/browse` 补服务类型聚合 |
-| M2.3 | `/api/alerts`（当前为 M0 契约占位实现，返回 `enabled:false`） |
+| M2.3（已交付） | `/api/alerts` 接入真实分发器（状态 / 计数 / 按 kind 统计 / 网关统计）；网关自身独立监听：`Host` 静态路由、`/go/` 辅助入口、404 / 502 友好页 |
 
 ## 4. 进度摘要
 
@@ -149,6 +150,7 @@
 | 2026-11-13 | M2.1 | 0 | 0/66 | 建立销项基线 |
 | 2026-11-13 | M2.1 | 24 | 24/66 | 协议内核 + 配置内核 + 真实 mDNS 引擎验收通过 |
 | 2026-11-13 | M2.2 | 19 | 43/66 | 可观测 + 安全 + 配置生命周期验收通过 |
+| 2026-11-13 | M2.3 | 18 | 61/66 | 告警 + 网关 + 部署运维验收通过，冒烟 221 项 |
 
 ## 5. M2.1 验收记录（2026-11-13）
 
@@ -268,7 +270,83 @@ LAN 发送 `224.0.0.251:5353` 流量；技术取舍见 `docs/ADR/0002-m2-1-proto
    `GET /api/config/snapshot?id=`、`probe_now` 接到启动首次同步探测（顺带让首帧
    健康状态不再是 `unknown`）；`is_some_and` 冗余闭包改为直接传函数指针。
 
-### 6.5 M2.3 入口
+### 6.5 M2.3 入口（已完成，见第 7 节）
 
-下一批：`F-G01`~`F-G05` 告警、`F-H01`~`F-H04` 网关、`F-I01`~`F-I07` 部署运维、
-`F-E09` 首次模板生成、`F-C03` 同机共存实测；并评估 `F-A12` 的 socket 级热切换。
+`F-C03`、`F-E09`、`F-G01`~`F-G05`、`F-H01`~`F-H04`、`F-I01`~`F-I07` 共 18 条
+已在 M2.3 销项。`F-A12` 的 socket 级接口热切换评估结论：接口集合变更必须重建
+组播 socket，属于不可热更字段，因此保持「配置可改、变更需重启」，管理台表单在
+M2.4 交付时明确提示，不伪装成热重载能力。
+
+## 7. M2.3 验收记录（2026-11-13）
+
+### 7.1 销项明细
+
+本批次 `done` 共 18 条：`F-C03`（1）、`F-E09`（1）、`F-G01`~`F-G05`（5）、
+`F-H01`~`F-H04`（4）、`F-I01`~`F-I07`（7）。累计 **61/66**。
+
+| 编号 | 验收证据 |
+| --- | --- |
+| F-C03 | 两个实例共享同一隔离组播地址 + 端口，均启动成功且都能应答 A 查询（冒烟 218~221） |
+| F-E09 | 首次启动在缺失路径生成内嵌模板；重启后用户追加内容不被覆盖；`install.sh` 同样不覆盖（冒烟 178~180） |
+| F-G01 | `common-alert` 五平台识别与载荷构造 9 个单测；本地通用 JSON Webhook 收到规范事件 |
+| F-G02 | up→down 翻转发出 `health_transition`，`extra.from/to` 正确；`unknown→up` 不发 |
+| F-G03 | watchdog 扫描新冲突发 `name_conflict`（`state.rs::scan_conflicts` + 冷却） |
+| F-G04 | 队列 200 / 重试 ≤2 / 冷却去重单测；运行态重复不可达事件被抑制（冒烟 209） |
+| F-G05 | `/api/alerts` 状态与按 kind 计数；配置保存热换 Webhook 列表无需重启（冒烟 212~213） |
+| F-H01 | `up.local` Host 路由转发上游内容；请求头原样、请求体流式透传 |
+| F-H02 | 全局关闭不创建监听（端口不可连 + gauge=0）；`disabled.local` 每服务开关返回 404 |
+| F-H03 | `mdns.local` 直达管理台 `/healthz` |
+| F-H04 | 未登记 404 / 不可达 502 均返回转义后的友好 HTML 页 |
+| F-I01 | musl 静态单文件；`--version` / `--print-config` 不依赖外部文件 |
+| F-I02 | `webui`（默认）与 `--cli` 双模式，CLI 不监听端口 |
+| F-I03 | `Dockerfile` + `docker-compose.yml`，`network_mode: host` 硬约束，`docker compose config -q` 通过 |
+| F-I04 | `lan-mdns.service`：SIGTERM 优雅退出、SIGHUP 重载、StateDirectory 持久化 |
+| F-I05 | `install.sh --upgrade` 保留 `config.yaml` / `auth.toml` / `logs/` / `history/`，`bash -n` 通过 |
+| F-I06 | 容器单卷 `/data` 覆盖配置 / 摘要 / 日志 / 快照 |
+| F-I07 | 二进制自带 `--healthcheck`，运行中 0、未运行非 0；Dockerfile 与 compose 均接入 |
+
+### 7.2 提前交付但不提前销项
+
+| 条目 | M2.3 已提供 | 归属 |
+| --- | --- | --- |
+| F-H05 | `/go/` 导航页与 `/go/?host=` 302 跳转（网关自带） | 正式管理台内入口属 M2.4 |
+| `config_invalid` / `config_reload_failed` | 已接入触发链路 | 属 ALERT-SCHEMA 已有 kind，非第 5 章独立编号 |
+
+### 7.3 验收证据
+
+| 门禁 | 结果 |
+| --- | --- |
+| M0 契约校验（完整模式） | **21 passed / 0 failed** |
+| `cargo fmt --all -- --check` | 通过 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | 通过 |
+| `cargo test --workspace` | **78 passed / 0 failed**（M2.2 为 62） |
+| `cargo build --release -p lan-mdns` | 成功，单文件约 1.5 MB（静态单文件由 release workflow 的 musl cross 构建保证） |
+| `python3 scripts/smoke_mdns.py` | **221 passed / 0 failed**（M2.2 为 160） |
+| 部署资产门禁 | `bash -n scripts/install.sh`、`docker compose config -q`、`python3 -m py_compile` 全通过 |
+| 真实告警链路 | 本地 Webhook 收到 `gateway_target_unreachable` + `health_transition` 两条规范事件，字段完整、`time` 以 `Z` 结尾、无凭据 |
+| 红线合规 | 网关仅路由已登记 Host；不缓存 / 不解析 / 不记录业务载荷；全局关闭零监听 |
+
+### 7.4 缺陷与修复记录
+
+1. 自研 YAML 解析器把内联数组 `webhooks: ["url"]` 存成标量，导致 Webhook 被静默
+   忽略 → `alert_config_from_flat()` 同时接受块列表与内联数组，模板注释改为块列表示例。
+2. `--healthcheck` 只调用一次 `read`，而管理服务器分两次写响应头与体，探针误判失败
+   → 改为循环读取直到出现 `"ok":true` 或连接关闭 / 超时。
+3. 网关友好页把调用方 `body` 当 HTML 直接插入，存在 Host 注入面 → `page()` 统一
+   `html_escape(body)`，单测覆盖 `<script>` 转义。
+4. `gateway.rs::read_head(&TcpStream)` 无法对不可变引用调用 `read`（E0596）→
+   改为 `mut stream: &TcpStream`。
+5. `--cli` 首次启动会写配置，CI 直接跑会在仓库根留下 `config.yaml` → CI 把
+   `LAN_STUDIO_CONFIG` 指向 `mktemp` 临时文件。
+6. `clippy::needless_as_bytes` / `derivable_impls` / `bool_assert_comparison` 三处
+   按提示修正，未使用 `#[allow]` 掩盖。
+7. 冒烟脚本内已有局部变量 `cli`（`CompletedProcess`）与新辅助函数同名 → 辅助函数
+   更名 `run_cli`；`import http.server` 被 `def http()` 覆盖 → 改为
+   `import http.server as httpserver`。
+
+### 7.5 M2.4 入口
+
+剩余 5 条：`F-A12`（多网卡管理台表单）、`F-D04`（健康状态灯与列表）、
+`F-E04`（在线配置表单 + 源码双模式）、`F-H05`（管理台内辅助跳转入口）、
+`F-J03`（API 契约测试 + CI 门禁）。同时按 PRD 8.1 完成组件级 DoD 核对与
+66 条全部销项。技术取舍见 `docs/ADR/0004-m2-3-alerting-gateway-deploy.md`。

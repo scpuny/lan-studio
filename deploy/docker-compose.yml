@@ -1,0 +1,37 @@
+# Lan Studio lan-mdns — Docker Compose deployment.
+#
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#   docker compose -f deploy/docker-compose.yml logs -f
+#
+# `network_mode: host` is a HARD constraint (F-I03): mDNS uses link-local
+# multicast 224.0.0.251:5353, which cannot traverse Docker's NAT/bridge.
+# Do not replace it with a `ports:` mapping.
+
+services:
+  lan-mdns:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: lan-studio/lan-mdns:local
+    container_name: lan-mdns
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_BIND_SERVICE   # only needed when mdns.gateway.port < 1024
+      - NET_RAW
+    environment:
+      LAN_STUDIO_CONFIG: /data/config.yaml
+      LAN_STUDIO_AUTH_FILE: /data/auth.toml
+      LAN_STUDIO_LOG_DIR: /data/logs
+      LAN_STUDIO_HISTORY_DIR: /data/history
+      LAN_STUDIO_PORT: "8080"
+      RUST_LOG: ""
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/lan-mdns", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 10s

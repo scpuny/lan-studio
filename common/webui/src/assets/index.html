@@ -28,12 +28,12 @@ footer{margin-top:32px;color:var(--muted);font-size:13px}
 <body>
 <main>
 <h1>Lan Studio</h1>
-<p class="sub">lan-mdns · M2.2 可观测 + 安全 + 配置生命周期 · 内嵌离线页面</p>
+<p class="sub">lan-mdns · M2.3 告警 + HTTP 网关 + 部署运维 · 内嵌离线页面</p>
 
 <div class="card">
 <p>本页由二进制编译期内嵌，运行时不依赖任何外部静态文件、CDN 或网络。</p>
-<p>当前里程碑 <strong>M2.2</strong>：真实 mDNS / DNS-SD 引擎之上已补齐管理员密码写保护、配置保存 / 快照 / 历史 / 回滚 / 导入导出 / 热重载、有界结构化日志与磁盘轮转、SSE 实时日志流、TCP 健康目标、名称冲突聚合、服务地图 TTL 老化，以及 13 个专有 Prometheus 指标族。</p>
-<p><strong>本页仍是占位页</strong>。按 PRD 7.5，Arco Design 正式管理台在 M2.4 交付；告警、内置 HTTP 网关与部署运维在 M2.3 上线。</p>
+<p>当前里程碑 <strong>M2.3</strong>：真实 mDNS / DNS-SD 引擎与完整可观测 / 安全 / 配置生命周期之上，已补齐五平台告警 Webhook（冷却 / 重试 / 热更新）、健康翻转与冲突触发、内置静态 Host 网关与友好页、首次启动模板生成、单文件 CLI 子命令、Docker / Compose / systemd / 一键安装升级与自带健康探针。66 条功能全集已销项 <strong>61 条</strong>。</p>
+<p><strong>本页仍是占位页</strong>。按 PRD 7.5，Arco Design 正式管理台、健康状态灯与在线配置表单在 M2.4 交付，届时完成剩余 5 条销项与组件级 DoD。</p>
 </div>
 
 <div class="card warn">
@@ -59,7 +59,7 @@ footer{margin-top:32px;color:var(--muted);font-size:13px}
 <li><a href="/api/health/targets"><code>GET /api/health/targets</code></a> <span>业务健康目标 up / down / unknown</span></li>
 <li><a href="/api/logs"><code>GET /api/logs</code></a> <span>有界结构化日志与磁盘上界</span></li>
 <li><a href="/api/logs/stream"><code>GET /api/logs/stream</code></a> <span>SSE 实时日志流（replay + keepalive）</span></li>
-<li><a href="/api/alerts"><code>GET /api/alerts</code></a> <span>告警状态占位（M2.3）</span></li>
+<li><a href="/api/alerts"><code>GET /api/alerts</code></a> <span>告警分发器状态、计数、按 kind 统计与网关统计</span></li>
 </ul>
 
 <h2>配置生命周期（写操作需 X-Admin-Password）</h2>
@@ -78,6 +78,15 @@ footer{margin-top:32px;color:var(--muted);font-size:13px}
 <li><a href="/api/auth"><code>GET /api/auth</code></a> <span>鉴权状态</span></li>
 <li><code>POST /api/auth/password</code> <span>设置 / 修改管理员密码</span></li>
 <li><code>POST /api/auth/verify</code> <span>校验管理员密码</span></li>
+</ul>
+
+<h2>M2.3 新增能力</h2>
+<ul>
+<li><code>--version / --print-config / --validate / --cli / --healthcheck</code> <span>单文件自举与探针，无需外部工具</span></li>
+<li><code>mdns.gateway.enabled + services[].proxy</code> <span>全局与每服务双开关；关闭时零监听</span></li>
+<li><code>Host: &lt;admin_host&gt;</code> <span>管理台统一域名入口；未登记 404 / 不可达 502 友好页</span></li>
+<li><code>/go/ · /go/?host=</code> <span>最小服务导航与跳转入口</span></li>
+<li><code>deploy/Dockerfile · docker-compose.yml · lan-mdns.service · scripts/install.sh</code> <span>host 网络、单卷持久化、优雅退出、升级保留数据</span></li>
 </ul>
 
 <h2>权威契约</h2>

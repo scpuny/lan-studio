@@ -20,6 +20,11 @@ logging:
 
 alerts:
   enabled: true
+  # Canonical events are adapted centrally by common-alert. Supported targets:
+  # dingtalk / feishu / slack / wecom / any generic JSON endpoint.
+  # Example (block list; inline ["url"] is accepted too):
+  # webhooks:
+  #   - "https://oapi.dingtalk.com/robot/send?access_token=..."
   webhooks: []
   cooldown_seconds: 300
   timeout_seconds: 5.0
@@ -57,6 +62,23 @@ mdns:
       type: _http._tcp.local
       host: nas.local
       port: 8080
+      # F-H02 per-service gateway switch (ignored while gateway.enabled=false).
+      proxy: true
       txt:
         path: /
         version: "1"
+
+  # M2.3 built-in HTTP gateway. OFF by default so port 80 is never claimed
+  # implicitly. PRD 1.4: only explicitly registered names are ever routed.
+  # A published service whose host has an A record becomes a route
+  # automatically; gateway.hosts[] can add or override the target.
+  gateway:
+    enabled: false
+    port: 80
+    listen: "0.0.0.0"
+    admin_host: "mdns.local"
+    timeout_seconds: 6.0
+    hosts: []
+    # - host: printer.local
+    #   target: "192.168.5.30:80"
+    #   proxy: true

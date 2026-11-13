@@ -1,0 +1,39 @@
+[Unit]
+Description=Lan Studio mDNS / DNS-SD responder
+Documentation=https://github.com/scpuny/lan-studio
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lanstudio
+Group=lanstudio
+
+# All mutable state lives under StateDirectory / LogsDirectory (F-I06).
+# The binary writes config.yaml from its embedded template on first boot and
+# never overwrites an existing one (F-E09).
+Environment=LAN_STUDIO_CONFIG=/var/lib/lan-studio/config.yaml
+Environment=LAN_STUDIO_AUTH_FILE=/var/lib/lan-studio/auth.toml
+Environment=LAN_STUDIO_LOG_DIR=/var/log/lan-studio
+Environment=LAN_STUDIO_HISTORY_DIR=/var/lib/lan-studio/history
+Environment=LAN_STUDIO_PORT=8080
+StateDirectory=lan-studio
+LogsDirectory=lan-studio
+
+ExecStart=/opt/lan-studio/lan-mdns
+ExecReload=/bin/kill -HUP $MAINPID
+# SIGTERM triggers the graceful path: Goodbye packets are broadcast before exit.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=3
+
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/lan-studio /var/log/lan-studio
+
+[Install]
+WantedBy=multi-user.target

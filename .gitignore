@@ -13,3 +13,6 @@ auth.toml
 auth.toml.tmp
 config_history/
 logs/
+config.yaml
+deploy/data/
+data/

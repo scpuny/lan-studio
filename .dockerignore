@@ -1,0 +1,15 @@
+.git
+.github
+target
+**/target
+docs
+scripts
+*/.workbuddy
+deploy/data
+data
+logs
+config_history
+auth.toml
+*.log
+*.tar.gz
+*.sha256

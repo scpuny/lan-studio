@@ -40,7 +40,7 @@ jobs:
       - name: Build release artifact
         run: cargo build --release -p lan-mdns
 
-      - name: Smoke test artifact (M2.1 + M2.2 runtime, isolated multicast)
+      - name: Smoke test artifact (M2.1 + M2.2 + M2.3 runtime, isolated multicast)
         env:
           LAN_STUDIO_CONFIG: components/lan-mdns/config.template.yaml
           LAN_STUDIO_PORT: "18080"
@@ -48,8 +48,15 @@ jobs:
           LAN_MDNS_GROUP: "239.1.2.3"
         run: |
           set -e
+          python3 -m py_compile scripts/smoke_mdns.py scripts/verify_contracts.py
+          bash -n scripts/install.sh
+          docker compose -f deploy/docker-compose.yml config -q
           python3 scripts/smoke_mdns.py
-          ./target/release/lan-mdns --cli | grep -q 'component=lan-mdns'
+          TMP_CFG="$(mktemp)"
+          LAN_STUDIO_CONFIG="$TMP_CFG" ./target/release/lan-mdns --cli | grep -q 'component=lan-mdns'
+          LAN_STUDIO_CONFIG="$TMP_CFG" ./target/release/lan-mdns --validate
+          ./target/release/lan-mdns --version | grep -q 'lan-mdns'
+          ./target/release/lan-mdns --print-config | grep -q 'component: lan-mdns'
           echo 'SMOKE OK'
 
       - name: Assert single-file artifact

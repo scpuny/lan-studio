@@ -45,17 +45,25 @@ lanstudio_<c>_<metric>[_<unit>]
 | `lanstudio_mdns_conflicts` | gauge | — | 冲突登记数 |
 | `lanstudio_mdns_config_history_versions` | gauge | — | 快照版本数 |
 | `lanstudio_mdns_auth_password_enabled` | gauge | — | 管理员密码是否已设置 |
-| `lanstudio_mdns_gateway_enabled` | gauge | — | HTTP 网关全局开关 |
+| `lanstudio_mdns_gateway_enabled` | gauge | — | HTTP 网关全局开关（M2.3 接真实值） |
+| `lanstudio_mdns_alerts_queued` | gauge | — | 等待投递的规范事件数（队列上界 200） |
+| `lanstudio_mdns_gateway_routes` | gauge | — | 已登记静态 Host 路由数 |
+| `lanstudio_mdns_gateway_requests_total` | counter | — | 网关请求总数（含转发 / 友好页 / 拒绝） |
+
+`alerts_sent_total{kind,result}` 属第 2 节必备族，M2.3 起按 `docs/ALERT-SCHEMA.md`
+已登记的 `kind` 输出真实样本（`result=ok|failed`）；`kind` 标签值只取登记表内的
+固定枚举，禁止把主机名 / IP / URL 作为标签。
 
 **可选单目标指标**：`lanstudio_mdns_health_target_up{target_alias}` 仅在目标配置了**别名**时输出，别名白名单上限 64；未配置别名时不得输出，目标明细走 `/api/health/targets`。
 
-**M2.2 实现状态**：上表 13 个专有族已全部实现并输出。M2.1 交付前 7 个中的 7 个
+**实现状态（M2.3 收尾）**：上表 16 个专有族已全部实现并输出。M2.1 交付 7 个
 （`records` / `queries_total` / `responses_total` / `announces_total` / `probe_total` /
-`query_audit_entries` / `browse_instances`）；M2.2 补齐剩余 6 个
+`query_audit_entries` / `browse_instances`）；M2.2 补齐 6 个
 （`bytes_total` / `health_targets` / `conflicts` / `config_history_versions` /
-`auth_password_enabled` / `gateway_enabled`）。`gateway_enabled` 在 M2.2 恒为 0，
-真实网关全局开关在 M2.3 接入——指标族先登记、后接值，保证 PRD 8.1「第 3 节全部
-存在」可在 M2.4 一次核对。冒烟脚本对 13 个族的存在性、标签取值与双前缀均有断言。
+`auth_password_enabled` / `gateway_enabled`）；M2.3 把 `gateway_enabled` 接上真实
+全局开关，并新增 3 个族（`alerts_queued` / `gateway_routes` /
+`gateway_requests_total`）以及 `alerts_sent_total{kind,result}` 的真实样本。
+冒烟脚本对 16 个族的存在性、标签取值、双前缀与开关 0/1 均有断言。
 
 ## 4. 标签规范（强制）
 

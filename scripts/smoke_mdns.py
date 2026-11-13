@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M2.1 + M2.2 runtime smoke test for the lan-mdns single binary.
+"""M2.1 + M2.2 + M2.3 runtime smoke test for the lan-mdns single binary.
 
 Pure standard library. Each instance gets its own temporary working directory
 (config, auth digest, logs and snapshot history), so a single run never writes
@@ -13,6 +13,11 @@ Coverage:
   * M2.2 — admin-password write protection, config save/import/export/history/
     rollback/reload, bounded structured logs, SSE stream, health targets,
     conflict aggregation and the remaining metric families.
+  * M2.3 — canonical alert webhooks (health transition / unreachable target /
+    cooldown / hot reconfiguration), static Host gateway with global and
+    per-service switches, friendly pages, /go/ helper, CLI subcommands,
+    first-boot template generation, deployment asset assertions and two
+    engines sharing one multicast port (system-daemon coexistence).
 
 Environment:
   LAN_MDNS_BIN      path to binary   (default target/release/lan-mdns)
@@ -22,6 +27,7 @@ Environment:
   LAN_STUDIO_CONFIG config template  (default components/lan-mdns/config.template.yaml)
 """
 
+import http.server as httpserver
 import json
 import os
 import shutil
@@ -31,6 +37,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -116,7 +123,7 @@ def free_port():
     return port
 
 
-def start_instance(config_text, http_port, mdns_port):
+def start_instance(config_text, http_port, mdns_port, extra_env=None):
     """Launch one fully isolated instance; return (proc, log, workdir, config_path)."""
     workdir = tempfile.mkdtemp(prefix="lanmdns-smoke-")
     config_path = os.path.join(workdir, "config.yaml")
@@ -134,6 +141,8 @@ def start_instance(config_text, http_port, mdns_port):
             "LAN_MDNS_GROUP": MDNS_GROUP,
         }
     )
+    if extra_env:
+        env.update(extra_env)
     log = tempfile.NamedTemporaryFile(
         mode="w+", prefix="lanmdns-smoke-", suffix=".log", delete=False
     )
@@ -183,6 +192,120 @@ def sse_probe(path, port=HTTP_PORT, timeout=1.5):
             break
     sock.close()
     return out.decode(errors="replace")
+
+
+HOOK_EVENTS = []
+
+
+class HookHandler(httpserver.BaseHTTPRequestHandler):
+    """Fake generic-JSON webhook receiver for F-G01..F-G04."""
+
+    def do_POST(self):
+        size = int(self.headers.get("Content-Length", 0))
+        HOOK_EVENTS.append(self.rfile.read(size).decode())
+        body = b"ok"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+class UpstreamHandler(httpserver.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b"UPSTREAM-OK"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+def start_http_service(handler):
+    server = httpserver.HTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def raw_gateway(port, host, path="/", timeout=4):
+    """Send an HTTP request with an arbitrary Host header (gateway routing)."""
+    sock = socket.create_connection(("127.0.0.1", port), timeout=timeout)
+    sock.settimeout(timeout)
+    request = "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
+        path, host
+    )
+    sock.sendall(request.encode())
+    out = b""
+    while True:
+        try:
+            chunk = sock.recv(4096)
+        except (socket.timeout, OSError):
+            break
+        if not chunk:
+            break
+        out += chunk
+    sock.close()
+    return out.decode(errors="replace")
+
+
+def port_is_closed(port):
+    try:
+        sock = socket.create_connection(("127.0.0.1", port), timeout=0.6)
+        sock.close()
+        return False
+    except OSError:
+        return True
+
+
+def run_cli(args, env=None, timeout=8):
+    merged = dict(os.environ)
+    if env:
+        merged.update(env)
+    done = subprocess.run(
+        [BIN] + args, cwd=ROOT, env=merged, capture_output=True,
+        text=True, timeout=timeout,
+    )
+    return done.returncode, done.stdout + done.stderr
+
+
+def repo_file(relative):
+    with open(os.path.join(ROOT, relative), "r") as handle:
+        return handle.read()
+
+
+def gateway_config(template, hook_port, upstream_port, health_port):
+    text = template.replace(
+        "  webhooks: []",
+        '  webhooks: ["http://127.0.0.1:{}/hook"]'.format(hook_port),
+    )
+    text = text.replace(
+        "    enabled: false\n    port: 80", "    enabled: true\n    port: 80"
+    )
+    text = text.replace(
+        "    hosts: []",
+        """    hosts:
+      - host: up.local
+        target: "127.0.0.1:{up}"
+        proxy: true
+      - host: dead.local
+        target: "127.0.0.1:1"
+        proxy: true
+      - host: disabled.local
+        target: "127.0.0.1:{up}"
+        proxy: false""".format(up=upstream_port),
+    )
+    text = text.replace(
+        "  health_targets: []",
+        """  health_targets:
+    - alias: gate
+      host: 127.0.0.1
+      port: {}""".format(health_port),
+    )
+    return text
 
 
 def main():
@@ -424,8 +547,13 @@ def main():
         check("no business health targets by default", health.get("total") == 0)
 
         status, _, raw = http("GET", "/api/alerts")
-        check("/api/alerts 200 (M2.3 placeholder)", status == 200
-              and data_of(raw).get("enabled") is False)
+        alert_state = data_of(raw)
+        check("/api/alerts 200 (dispatcher state)", status == 200
+              and alert_state.get("queue_capacity") == 200)
+        check("no webhooks configured in the default template",
+              alert_state.get("webhooks") == 0)
+        check("gateway disabled in the default template",
+              alert_state.get("gateway", {}).get("enabled") is False)
 
         status, _, raw = http("GET", "/api/metrics")
         families = [
@@ -683,6 +811,293 @@ def main():
         if proc2.poll() is None:
             proc2.kill()
             proc2.wait(timeout=5)
+
+    # ======================= M2.3 deployment assets ========================
+    dockerfile = repo_file("deploy/Dockerfile")
+    compose = repo_file("deploy/docker-compose.yml")
+    unit = repo_file("deploy/lan-mdns.service")
+    installer = repo_file("scripts/install.sh")
+    check("F-I01 Dockerfile builds a single release binary",
+          "cargo build --release -p lan-mdns" in dockerfile and "ENTRYPOINT" in dockerfile)
+    check("F-I07 Dockerfile probes with the binary itself",
+          "HEALTHCHECK" in dockerfile and "--healthcheck" in dockerfile)
+    check("F-I03 compose enforces host network", "network_mode: host" in compose)
+    check("F-I06 compose persists all state in one volume",
+          "./data:/data" in compose and "LAN_STUDIO_AUTH_FILE" in compose)
+    check("F-I07 compose healthcheck is wired",
+          "healthcheck:" in compose and "--healthcheck" in compose)
+    check("F-I04 systemd unit uses graceful SIGTERM",
+          "KillSignal=SIGTERM" in unit and "StateDirectory" in unit)
+    check("F-I04 systemd unit reloads via SIGHUP", "ExecReload" in unit)
+    check("F-I05 installer supports --upgrade", "--upgrade" in installer)
+    check("F-I05 installer preserves config/credentials/logs",
+          "config.yaml" in installer and "auth.toml" in installer
+          and "logs" in installer and "history" in installer)
+    check("F-E09 installer never overwrites an existing config",
+          'if [ ! -f "$DATA/config.yaml" ]' in installer)
+    bash_rc = subprocess.run(
+        ["bash", "-n", "scripts/install.sh"], cwd=ROOT, capture_output=True
+    ).returncode
+    check("install.sh passes bash -n", bash_rc == 0)
+    if shutil.which("docker"):
+        compose_rc = subprocess.run(
+            ["docker", "compose", "-f", "deploy/docker-compose.yml", "config", "-q"],
+            cwd=ROOT, capture_output=True,
+        ).returncode
+        check("docker compose config -q passes", compose_rc == 0)
+
+    # ======================= M2.3 CLI / first boot =========================
+    boot_dir = tempfile.mkdtemp(prefix="lanmdns-boot-")
+    try:
+        boot_cfg = os.path.join(boot_dir, "data", "config.yaml")
+        boot_env = {"LAN_STUDIO_CONFIG": boot_cfg,
+                    "LAN_STUDIO_PORT": str(HTTP_PORT + 7)}
+        rc, out = run_cli(["--version"], boot_env)
+        check("F-I02 --version prints component/version",
+              rc == 0 and "lan-mdns" in out and "0.1.0" in out)
+        rc, out = run_cli(["--print-config"], boot_env)
+        check("F-E09 --print-config emits the embedded YAML template",
+              rc == 0 and "component: lan-mdns" in out and "gateway:" in out)
+        rc, out = run_cli(["--cli"], boot_env)
+        check("F-I02 --cli validates without listening",
+              rc == 0 and "no listener started" in out)
+        check("F-E09 first boot generates config on disk", os.path.isfile(boot_cfg))
+        generated = open(boot_cfg).read() if os.path.isfile(boot_cfg) else ""
+        check("F-E09 generated config is the real template",
+              "component: lan-mdns" in generated and "mdns:" in generated)
+        with open(boot_cfg, "a") as handle:
+            handle.write("\n# user marker\n")
+        run_cli(["--cli"], boot_env)
+        check("F-E09 restart never overwrites user config",
+              "# user marker" in open(boot_cfg).read())
+        rc, out = run_cli(["--validate"], boot_env)
+        check("F-E02 --validate validates offline", rc == 0 and "config valid" in out)
+        bad_cfg = os.path.join(boot_dir, "bad.yaml")
+        with open(bad_cfg, "w") as handle:
+            handle.write("component: not-a-lan-component\n")
+        rc, out = run_cli(["--validate"],
+                      {**boot_env, "LAN_STUDIO_CONFIG": bad_cfg})
+        check("--validate rejects an invalid config", rc != 0)
+        rc, out = run_cli(["--healthcheck"],
+                      {**boot_env, "LAN_STUDIO_PORT": str(HTTP_PORT + 7)})
+        check("F-I07 --healthcheck fails when server is down", rc != 0)
+        rc, out = run_cli(["--print-config"], boot_env)
+        check("F-I01 binary needs no external config to print the template",
+              rc == 0 and "version: 1" in out)
+    finally:
+        shutil.rmtree(boot_dir, ignore_errors=True)
+
+    # ======================= M2.3 alerts + gateway =========================
+    hook = start_http_service(HookHandler)
+    upstream = start_http_service(UpstreamHandler)
+    hook_port = hook.server_address[1]
+    upstream_port = upstream.server_address[1]
+    gate = socket.socket()
+    gate.bind(("127.0.0.1", 0))
+    gate.listen(1)
+    health_port = gate.getsockname()[1]
+    gateway_port = free_port()
+    base3 = "http://127.0.0.1:{}".format(HTTP_PORT + 2)
+    config3 = gateway_config(template_text, hook_port, upstream_port, health_port)
+    HOOK_EVENTS.clear()
+    proc3, log3, workdir3, config_path3 = start_instance(
+        config3, HTTP_PORT + 2, MDNS_PORT + 2,
+        {"LAN_MDNS_GATEWAY_PORT": str(gateway_port)},
+    )
+    try:
+        check("M2.3 alert+gateway instance ready", wait_ready(base3))
+        status, _, raw = http("GET", "/api/alerts", base=base3)
+        alerts = data_of(raw)
+        check("/api/alerts reports the configured webhook", alerts.get("webhooks") == 1)
+        check("/api/alerts exposes bounded queue capacity",
+              alerts.get("queue_capacity") == 200)
+        check("/api/alerts reports gateway state",
+              alerts.get("gateway", {}).get("enabled") is True)
+
+        proxied = raw_gateway(gateway_port, "up.local")
+        check("F-H01 registered Host is forwarded verbatim",
+              "UPSTREAM-OK" in proxied and "200" in proxied.split("\r\n")[0])
+        admin = raw_gateway(gateway_port, "mdns.local", "/healthz")
+        check("F-H03 admin host reaches the console",
+              "200" in admin.split("\r\n")[0] and '"ok":true' in admin)
+        unknown = raw_gateway(gateway_port, "unknown.local")
+        check("F-H04 unregistered host gets a friendly 404",
+              "404" in unknown.split("\r\n")[0] and "未登记" in unknown
+              and "text/html" in unknown)
+        unreachable = raw_gateway(gateway_port, "dead.local")
+        check("F-H04 unreachable target gets a friendly 502",
+              "502" in unreachable.split("\r\n")[0] and "不可达" in unreachable)
+        disabled = raw_gateway(gateway_port, "disabled.local")
+        check("F-H02 per-service proxy switch blocks a route",
+              "404" in disabled.split("\r\n")[0])
+        go_page = raw_gateway(gateway_port, "mdns.local", "/go/")
+        check("F-H05 /go/ helper navigation lists registered names",
+              "200" in go_page.split("\r\n")[0] and "up.local" in go_page)
+        redirect = raw_gateway(gateway_port, "mdns.local", "/go/?host=up.local")
+        check("/go/?host= redirects to the registered name",
+              "302" in redirect.split("\r\n")[0]
+              and "Location: http://up.local/" in redirect)
+
+        rc, _ = run_cli(["--healthcheck"],
+                    {"LAN_STUDIO_CONFIG": config_path3,
+                     "LAN_STUDIO_PORT": str(HTTP_PORT + 2)})
+        check("F-I07 --healthcheck succeeds against a live server", rc == 0)
+
+        status, _, _ = http(
+            "POST", "/api/auth/password", {"new_password": "smoke-pass-123"},
+            base=base3,
+        )
+        check("admin password initialised for reload", status == 200)
+        gate.close()
+        status, _, raw = http(
+            "POST", "/api/config", {"text": config3},
+            password="smoke-pass-123", base=base3,
+        )
+        check("config reload triggers health re-probe", status == 200, raw[:120])
+
+        deadline = time.time() + 8
+        while time.time() < deadline and len(HOOK_EVENTS) < 2:
+            time.sleep(0.15)
+        parsed = []
+        for payload in HOOK_EVENTS:
+            try:
+                parsed.append(json.loads(payload))
+            except ValueError:
+                pass
+        kinds = [item.get("kind") for item in parsed]
+        check("F-G02 health transition triggers a webhook",
+              "health_transition" in kinds, str(kinds))
+        check("gateway unreachable triggers a webhook",
+              "gateway_target_unreachable" in kinds, str(kinds))
+        check("F-G01 events satisfy the canonical schema",
+              len(parsed) >= 2 and all(
+                  all(key in item for key in
+                      ("source", "level", "kind", "title", "detail", "time"))
+                  and item["time"].endswith("Z")
+                  and item["source"] == "lan-mdns"
+                  for item in parsed
+              ))
+        check("F-G04 no credentials in event bodies",
+              all("smoke-pass-123" not in payload for payload in HOOK_EVENTS))
+        transition = next(
+            (item for item in parsed if item.get("kind") == "health_transition"), {}
+        )
+        check("F-G02 transition carries from/to extra",
+              transition.get("extra", {}).get("from") == "up"
+              and transition.get("extra", {}).get("to") == "down",
+              str(transition.get("extra")))
+
+        status, _, raw = http("GET", "/api/alerts", base=base3)
+        alerts = data_of(raw)
+        check("/api/alerts sent counter reflects deliveries",
+              alerts.get("sent", 0) >= 2, str(alerts.get("sent")))
+        check("/api/alerts exposes per-kind counters",
+              len(alerts.get("by_kind", [])) >= 2)
+        status, _, metrics = http("GET", "/api/metrics", base=base3)
+        check("M2.3 metric families are exposed",
+              all(name in metrics for name in (
+                  "lanstudio_mdns_gateway_routes",
+                  "lanstudio_mdns_gateway_requests_total",
+                  "lanstudio_mdns_alerts_queued",
+              )))
+        check("alerts_sent_total is labelled by kind/result",
+              'alerts_sent_total{kind="health_transition",result="ok"}' in metrics)
+        check("F-H02 gateway_enabled gauge is 1 when on",
+              "lanstudio_mdns_gateway_enabled 1" in metrics)
+
+        before = len(HOOK_EVENTS)
+        raw_gateway(gateway_port, "dead.local")
+        time.sleep(0.9)
+        check("F-G04 cooldown suppresses a repeat incident",
+              len(HOOK_EVENTS) == before,
+              "before={} after={}".format(before, len(HOOK_EVENTS)))
+
+        status, _, raw = http("GET", "/api/status", base=base3)
+        status_data = data_of(raw)
+        check("F-H02 status reports gateway state",
+              status_data.get("gateway", {}).get("enabled") is True)
+        check("F-G05 status reports alert state",
+              status_data.get("alerts", {}).get("enabled") is True)
+
+        no_hook = config3.replace(
+            '  webhooks: ["http://127.0.0.1:{}/hook"]'.format(hook_port),
+            "  webhooks: []",
+        )
+        status, _, raw = http(
+            "POST", "/api/config", {"text": no_hook},
+            password="smoke-pass-123", base=base3,
+        )
+        check("F-G05 hot reconfiguration accepts a config save", status == 200)
+        status, _, raw = http("GET", "/api/alerts", base=base3)
+        check("F-G05 webhook list is hot-swapped without restart",
+              data_of(raw).get("webhooks") == 0)
+    finally:
+        stop_instance(proc3, log3, workdir3)
+        if proc3.poll() is None:
+            proc3.kill()
+            proc3.wait(timeout=5)
+        gate.close()
+        hook.shutdown()
+        upstream.shutdown()
+
+    # ============ F-H02 global switch off must create no listener ==========
+    off_port = free_port()
+    proc4, log4, workdir4, _ = start_instance(
+        template_text, HTTP_PORT + 6, MDNS_PORT + 6,
+        {"LAN_MDNS_GATEWAY_PORT": str(off_port)},
+    )
+    try:
+        base4 = "http://127.0.0.1:{}".format(HTTP_PORT + 6)
+        check("gateway-off instance ready", wait_ready(base4))
+        check("F-H02 no gateway socket when globally disabled",
+              port_is_closed(off_port))
+        status, _, raw = http("GET", "/api/status", base=base4)
+        check("F-H02 status reports gateway disabled",
+              data_of(raw).get("gateway", {}).get("enabled") is False)
+        status, _, metrics = http("GET", "/api/metrics", base=base4)
+        check("F-H02 gateway_enabled gauge is 0 when off",
+              "lanstudio_mdns_gateway_enabled 0" in metrics)
+    finally:
+        stop_instance(proc4, log4, workdir4)
+        if proc4.poll() is None:
+            proc4.kill()
+            proc4.wait(timeout=5)
+
+    # ============ F-C03 two engines share one multicast group/port =========
+    shared_port = MDNS_PORT + 4
+    procA, logA, workA, _ = start_instance(
+        template_text, HTTP_PORT + 4, shared_port
+    )
+    procB, logB, workB, _ = start_instance(
+        template_text, HTTP_PORT + 5, shared_port
+    )
+    try:
+        baseA = "http://127.0.0.1:{}".format(HTTP_PORT + 4)
+        baseB = "http://127.0.0.1:{}".format(HTTP_PORT + 5)
+        check("F-C03 instance A starts on the shared multicast port",
+              wait_ready(baseA))
+        check("F-C03 instance B starts on the same multicast port",
+              wait_ready(baseB))
+        for label, base in (("A", baseA), ("B", baseB)):
+            status, _, raw = http(
+                "POST", "/api/probe", {"name": "nas.local", "type": "A"},
+                base=base,
+            )
+            answers = data_of(raw).get("answers", [])
+            check(
+                "F-C03 instance {} still answers over the shared socket".format(label),
+                status == 200 and any(
+                    item.get("value") == "192.168.5.10" for item in answers
+                ),
+                str(answers)[:120],
+            )
+    finally:
+        stop_instance(procA, logA, workA)
+        stop_instance(procB, logB, workB)
+        for proc in (procA, procB):
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
 
     passed = sum(1 for _, ok, _ in RESULTS if ok)
     failed = [name for name, ok, _ in RESULTS if not ok]

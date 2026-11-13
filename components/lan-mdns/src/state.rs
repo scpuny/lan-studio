@@ -12,10 +12,12 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use common_alert::{AlertEvent, Dispatcher};
 use common_dns::{type_name, ResourceRecord, TYPE_PTR};
 
 use crate::config::HealthTargetDef;
 use crate::engine::{rdata_text, ObservedEntry};
+use crate::gateway::Gateway;
 use crate::store::ConfigStore;
 
 fn now() -> f64 {
@@ -23,6 +25,10 @@ fn now() -> f64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs_f64()
+}
+
+fn target_key(status: &TargetStatus) -> String {
+    format!("{}|{}|{}", status.alias, status.host, status.port)
 }
 
 // ------------------------------------------------------------- F-D03 health
@@ -43,10 +49,16 @@ pub struct HealthMonitor {
     targets: RwLock<Vec<HealthTargetDef>>,
     states: RwLock<Vec<TargetStatus>>,
     running: Arc<AtomicBool>,
+    /// F-G02: up->down / down->up transitions become canonical events.
+    on_transition: Arc<dyn Fn(AlertEvent) + Send + Sync>,
 }
 
 impl HealthMonitor {
-    pub fn start(targets: Vec<HealthTargetDef>, interval_s: u64) -> Arc<Self> {
+    pub fn start(
+        targets: Vec<HealthTargetDef>,
+        interval_s: u64,
+        on_transition: Arc<dyn Fn(AlertEvent) + Send + Sync>,
+    ) -> Arc<Self> {
         let initial: Vec<TargetStatus> = targets
             .iter()
             .map(|target| TargetStatus {
@@ -62,6 +74,7 @@ impl HealthMonitor {
             targets: RwLock::new(targets),
             states: RwLock::new(initial),
             running: Arc::new(AtomicBool::new(true)),
+            on_transition,
         });
         let worker = Arc::clone(&monitor);
         thread::spawn(move || worker.run(interval_s.max(1)));
@@ -94,6 +107,13 @@ impl HealthMonitor {
 
     fn probe_all(&self) {
         let targets = self.targets.read().unwrap().clone();
+        let previous: BTreeMap<String, String> = self
+            .states
+            .read()
+            .unwrap()
+            .iter()
+            .map(|status| (target_key(status), status.state.clone()))
+            .collect();
         let mut next = Vec::with_capacity(targets.len());
         for target in &targets {
             let address = format!("{}:{}", target.host, target.port);
@@ -119,7 +139,38 @@ impl HealthMonitor {
                 latency_ms: start.elapsed().as_secs_f64() * 1000.0,
             });
         }
+        let mut transitions = Vec::new();
+        for status in &next {
+            if let Some(from) = previous.get(&target_key(status)) {
+                // `unknown` is the initial probe, not a business transition
+                // (F-G02 requires up->down / down->up only).
+                if from != &status.state && from != "unknown" && status.state != "unknown" {
+                    let label = if status.alias.is_empty() {
+                        format!("{}:{}", status.host, status.port)
+                    } else {
+                        status.alias.clone()
+                    };
+                    transitions.push(
+                        AlertEvent::new(
+                            "lan-mdns",
+                            "warning",
+                            "health_transition",
+                            &format!("健康状态翻转：{}", label),
+                            &format!("{} 从 {} 变为 {}", label, from, status.state),
+                            &target_key(status),
+                        )
+                        .with_extra("target_alias", &status.alias)
+                        .with_extra("from", from)
+                        .with_extra("to", &status.state)
+                        .with_cooldown(300),
+                    );
+                }
+            }
+        }
         *self.states.write().unwrap() = next;
+        for event in transitions {
+            (self.on_transition)(event);
+        }
     }
 
     pub fn snapshot(&self) -> Vec<TargetStatus> {
@@ -285,8 +336,10 @@ pub struct State {
     pub health: Arc<HealthMonitor>,
     /// Aging window for query audit / observed rings (F-C06).
     pub aging_ttl_s: f64,
-    /// M2.3 owns the real gateway; the metric family must exist from M2.2.
-    pub gateway_enabled: bool,
+    /// Canonical-event dispatcher (F-G01..F-G05).
+    pub alerts: Arc<Dispatcher>,
+    /// `None` when the global gateway switch is off (F-H02).
+    pub gateway: Option<Arc<Gateway>>,
 }
 
 impl State {
@@ -413,7 +466,14 @@ mod tests {
                 port: down_port,
             },
         ];
-        let monitor = HealthMonitor::start(targets, 60);
+        let events: Arc<std::sync::Mutex<Vec<AlertEvent>>> =
+            Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = Arc::clone(&events);
+        let monitor = HealthMonitor::start(
+            targets,
+            60,
+            Arc::new(move |event: AlertEvent| sink.lock().unwrap().push(event)),
+        );
         monitor.probe_now();
         let states = monitor.snapshot();
         assert_eq!(states.len(), 2);
@@ -421,7 +481,17 @@ mod tests {
         assert_eq!(states[1].state, "down");
         assert_eq!(monitor.counts(), (1, 1, 0));
         assert!(states[0].checked_at > 0.0);
-        monitor.shutdown();
+        // The initial unknown->up probe must NOT produce an alert (F-G02).
+        assert!(events.lock().unwrap().is_empty());
+        // up->down is a real transition and must produce a canonical event.
         drop(listener);
+        monitor.probe_now();
+        let recorded = events.lock().unwrap();
+        assert_eq!(recorded.len(), 1, "{:?}", recorded);
+        assert_eq!(recorded[0].kind, "health_transition");
+        assert_eq!(recorded[0].level, "warning");
+        assert!(recorded[0].time.ends_with('Z'));
+        drop(recorded);
+        monitor.shutdown();
     }
 }

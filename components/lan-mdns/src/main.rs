@@ -1,12 +1,14 @@
-//! lan-mdns M2.2 — real mDNS / DNS-SD responder with the full observability,
-//! security and configuration-lifecycle API surface.
+//! lan-mdns M2.3 — real mDNS / DNS-SD responder with observability, security,
+//! configuration lifecycle, alerting, a static Host gateway and deployment
+//! subcommands.
 //!
 //! M2.1 owns the protocol kernel (`common-dns` / `common-net` / `engine.rs`);
 //! this file is composition, HTTP routing, config lifecycle and graceful
-//! shutdown. See `docs/ADR/0003-m2-2-observability-security.md`.
+//! shutdown. See `docs/ADR/0003` and `docs/ADR/0004`.
 
 mod config;
 mod engine;
+mod gateway;
 mod state;
 mod store;
 
@@ -16,10 +18,12 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
+use common_alert::{AlertConfig, AlertEvent, DefaultSender, Dispatcher};
 use common_api::{err, json_quote, ok, App, Context, Request, Response, SseSpec};
 use common_auth::{PasswordGuard, PasswordManager};
 use common_config::{
-    apply_flat, config_path_from_env, get_u32, get_u64, port_from_env, validate_text, Config,
+    apply_flat, config_path_from_env, get_bool, get_str, get_u32, get_u64, port_from_env,
+    validate_text, Config,
 };
 use common_dns::{
     type_name, validate_name, TYPE_A, TYPE_AAAA, TYPE_ANY, TYPE_PTR, TYPE_SRV, TYPE_TXT,
@@ -32,6 +36,7 @@ use common_webui::INDEX_HTML;
 
 use config::MdnsConfig;
 use engine::Engine;
+use gateway::Gateway;
 use state::{HealthMonitor, State};
 use store::{ConfigStore, Snapshot};
 
@@ -44,6 +49,12 @@ const HEALTH_INTERVAL_S: u64 = 15;
 static ENGINE: OnceLock<Arc<Engine>> = OnceLock::new();
 static STATE: OnceLock<Arc<State>> = OnceLock::new();
 static LOGS: OnceLock<Arc<LogBuffer>> = OnceLock::new();
+static ALERTS: OnceLock<Arc<Dispatcher>> = OnceLock::new();
+static GATEWAY: OnceLock<Arc<Gateway>> = OnceLock::new();
+/// Conflict identities already reported in this process; the dispatcher's
+/// cooldown is the authoritative guard, this set only avoids re-scan churn.
+static SEEN_CONFLICTS: OnceLock<std::sync::Mutex<std::collections::BTreeSet<String>>> =
+    OnceLock::new();
 
 #[cfg(unix)]
 mod signals {
@@ -94,7 +105,8 @@ mod signals {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let path = config_path_from_env();
-    let (text, flat, common, mut mdns) = match load_and_validate(&path) {
+    handle_subcommands(&args, &path);
+    let (text, flat, common, mut mdns) = match load_and_validate(&path, true) {
         Ok(value) => value,
         Err(message) => {
             eprintln!("{}", common_log::error("lan-mdns", &message));
@@ -149,7 +161,7 @@ fn main() {
     // `--cli` above always reports the config file's own values.
     apply_overrides(&mut mdns);
 
-    // --- M2.2 runtime state ------------------------------------------------
+    // --- M2.2 / M2.3 runtime state -----------------------------------------
     let log_dir = env_or("LAN_STUDIO_LOG_DIR", "logs");
     let auth_file = env_or("LAN_STUDIO_AUTH_FILE", "auth.toml");
     let history_dir = env_or("LAN_STUDIO_HISTORY_DIR", "config_history");
@@ -173,6 +185,13 @@ fn main() {
     };
     let log_buffer = Arc::new(LogBuffer::new(512, rotating));
     let _ = LOGS.set(Arc::clone(&log_buffer));
+
+    // F-G01..G05: one bounded dispatcher owns every canonical alert event.
+    let alerts = Dispatcher::start(alert_config_from_flat(&flat), Box::new(DefaultSender));
+    let _ = ALERTS.set(Arc::clone(&alerts));
+    let _ = SEEN_CONFLICTS.set(std::sync::Mutex::new(
+        std::collections::BTreeSet::<String>::new(),
+    ));
 
     let password = match PasswordManager::load(&auth_file) {
         Ok(manager) => manager,
@@ -206,14 +225,58 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let health = HealthMonitor::start(mdns.health_targets.clone(), HEALTH_INTERVAL_S);
+    let port = port_from_env(common.port);
+    let addr = format!("{}:{}", common.listen, port);
+    let admin_addr = format!("127.0.0.1:{}", port);
+
+    let health = HealthMonitor::start(
+        mdns.health_targets.clone(),
+        HEALTH_INTERVAL_S,
+        Arc::new(|event: AlertEvent| emit_alert(event)),
+    );
+
+    // F-H01..F-H04: the global switch decides whether a socket exists at all.
+    let mut gateway_cfg = mdns.gateway.clone();
+    if let Some(override_port) = std::env::var("LAN_MDNS_GATEWAY_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+    {
+        if override_port > 0 {
+            gateway_cfg.port = override_port;
+        }
+    }
+    let gateway = match Gateway::start(&gateway_cfg, &admin_addr, |host| {
+        emit_alert(
+            AlertEvent::new(
+                "lan-mdns",
+                "info",
+                "gateway_target_unreachable",
+                "网关目标不可达",
+                &format!("已登记域名 {} 的转发目标当前无法连接", host),
+                &host,
+            )
+            .with_extra("host", &host)
+            .with_cooldown(600),
+        );
+    }) {
+        Ok(instance) => instance,
+        Err(error) => {
+            emit("warning", &format!("HTTP gateway disabled: {}", error));
+            None
+        }
+    };
+    if let Some(instance) = &gateway {
+        let _ = GATEWAY.set(Arc::clone(instance));
+    }
+
     let state = Arc::new(State {
         store,
         log_buffer: Arc::clone(&log_buffer),
         password: Arc::clone(&password),
         health: Arc::clone(&health),
         aging_ttl_s,
-        gateway_enabled: false, // M2.3 owns the real gateway
+        alerts: Arc::clone(&alerts),
+        gateway: gateway.clone(),
     });
     let _ = STATE.set(Arc::clone(&state));
 
@@ -280,21 +343,25 @@ fn main() {
     signals::install();
     spawn_watchdog();
 
-    let port = port_from_env(common.port);
-    let addr = format!("{}:{}", common.listen, port);
     // First /api/health/targets read should carry real state, not "unknown".
     health.probe_now();
     health_state.mark_ready();
+    let gateway_info = gateway.as_ref().map_or_else(
+        || "gateway=off".to_string(),
+        |item| format!("gateway=:{}", item.port),
+    );
     emit(
         "info",
         &format!(
-            "mDNS {}:{} ready, HTTP {}, {} records / {} services, password_set={}",
+            "mDNS {}:{} ready, HTTP {}, {} records / {} services, password_set={}, {}, alert_webhooks={}",
             group,
             mdns_port,
             addr,
             record_count,
             service_count,
-            password.is_set()
+            password.is_set(),
+            gateway_info,
+            alerts.status().webhooks
         ),
     );
     if let Err(error) = app.serve(&addr, ctx) {
@@ -303,8 +370,139 @@ fn main() {
     }
 }
 
+/// F-I02 / F-I07 / F-E02: offline, non-listening subcommands. None of these
+/// bind a socket (except `--healthcheck`, which only makes an outbound probe).
+fn handle_subcommands(args: &[String], path: &str) {
+    let flag = |name: &str| args.iter().any(|arg| arg == name);
+    let version = env!("CARGO_PKG_VERSION");
+    let commit = option_env!("GIT_COMMIT").unwrap_or("dev");
+
+    if flag("--version") || flag("-V") {
+        println!(
+            "lan-mdns {} ({}) {}-{}",
+            version,
+            commit,
+            std::env::consts::ARCH,
+            std::env::consts::OS
+        );
+        std::process::exit(0);
+    }
+    if flag("--print-config") {
+        print!("{}", DEFAULT_CONFIG);
+        std::process::exit(0);
+    }
+    if flag("--validate") {
+        match load_and_validate(path, false) {
+            Ok((_, _, _, mdns)) => {
+                println!(
+                    "{}",
+                    common_log::info(
+                        "lan-mdns",
+                        &format!(
+                            "config valid: {} ({} records / {} services)",
+                            path,
+                            mdns.records.len(),
+                            mdns.services.len()
+                        )
+                    )
+                );
+                std::process::exit(0);
+            }
+            Err(message) => {
+                eprintln!("{}", common_log::error("lan-mdns", &message));
+                std::process::exit(1);
+            }
+        }
+    }
+    if flag("--healthcheck") {
+        let port = match load_and_validate(path, false) {
+            Ok((_, _, common, _)) => port_from_env(common.port),
+            Err(_) => port_from_env(8080),
+        };
+        if probe_local_healthz(port).unwrap_or(false) {
+            std::process::exit(0);
+        }
+        eprintln!("healthcheck failed on 127.0.0.1:{}", port);
+        std::process::exit(1);
+    }
+}
+
+/// Docker/systemd health probe: the single binary is its own probe client, so
+/// the runtime image needs neither curl nor a shell (F-I01 / F-I07).
+fn probe_local_healthz(port: u16) -> std::io::Result<bool> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+
+    let mut stream = TcpStream::connect(("127.0.0.1", port))?;
+    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+    stream.write_all(b"GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")?;
+    // The management server writes the head and the body separately, so a
+    // single `read` may observe only the status line. Drain until the liveness
+    // marker is present (or the connection closes / times out).
+    let mut collected = String::new();
+    let mut buffer = [0u8; 512];
+    loop {
+        match stream.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => {
+                collected.push_str(&String::from_utf8_lossy(&buffer[..count]));
+                if collected.contains("\"ok\":true") {
+                    break;
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    Ok(collected.starts_with("HTTP/1.1 200") && collected.contains("\"ok\":true"))
+}
+
 fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+/// Parse the frozen `alerts:` segment into the dispatcher configuration.
+fn alert_config_from_flat(flat: &HashMap<String, String>) -> AlertConfig {
+    let enabled =
+        get_bool(flat, "alerts.enabled", true) && get_bool(flat, "observability.alerts", true);
+    let mut webhooks = Vec::new();
+    fn push_url(list: &mut Vec<String>, value: &str) {
+        let url = value.trim().trim_matches('"').trim_matches('\'').trim();
+        if url.starts_with("http://") || url.starts_with("https://") {
+            list.push(url.to_string());
+        }
+    }
+    for index in 0..common_config::list_len(flat, "alerts.webhooks") {
+        push_url(
+            &mut webhooks,
+            &get_str(flat, &format!("alerts.webhooks[{}]", index), ""),
+        );
+    }
+    // The minimal YAML reader expands `- item` lists but keeps inline arrays
+    // as one scalar; accept both spellings so a documented example works.
+    let inline = get_str(flat, "alerts.webhooks", "");
+    if inline.starts_with('[') && inline.ends_with(']') {
+        for item in inline[1..inline.len() - 1].split(',') {
+            push_url(&mut webhooks, item);
+        }
+    }
+    let timeout = get_str(flat, "alerts.timeout_seconds", "5.0")
+        .parse::<f64>()
+        .unwrap_or(5.0)
+        .clamp(0.1, 30.0);
+    AlertConfig {
+        enabled,
+        webhooks,
+        cooldown_seconds: get_u64(flat, "alerts.cooldown_seconds", 300),
+        timeout: Duration::from_millis((timeout * 1000.0) as u64),
+        max_retries: get_u32(flat, "alerts.max_retries", 2).min(2),
+    }
+}
+
+fn emit_alert(event: AlertEvent) {
+    if let Some(dispatcher) = ALERTS.get() {
+        dispatcher.emit(event);
+    }
 }
 
 /// Emit one structured record to stderr and to the bounded SSE/disk buffer.
@@ -320,9 +518,31 @@ fn emit(level: &str, msg: &str) {
 /// namespaces. No socket or file is written here (F-E02).
 fn load_and_validate(
     path: &str,
+    bootstrap: bool,
 ) -> Result<(String, HashMap<String, String>, Config, MdnsConfig), String> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
+        Err(_) if bootstrap => {
+            // F-E09: write the compiled-in template exactly once. An existing
+            // file is *never* overwritten, so upgrades keep user settings.
+            if let Some(parent) = std::path::Path::new(path).parent() {
+                if !parent.as_os_str().is_empty() {
+                    fs::create_dir_all(parent).map_err(|error| {
+                        format!("cannot create {}: {}", parent.display(), error)
+                    })?;
+                }
+            }
+            fs::write(path, DEFAULT_CONFIG)
+                .map_err(|error| format!("cannot write {}: {}", path, error))?;
+            eprintln!(
+                "{}",
+                common_log::info(
+                    "lan-mdns",
+                    &format!("first boot: generated config template at {}", path)
+                )
+            );
+            DEFAULT_CONFIG.to_string()
+        }
         Err(_) => {
             eprintln!(
                 "{}",
@@ -368,14 +588,58 @@ fn apply_overrides(mdns: &mut MdnsConfig) {
 /// F-E03: validate a config text, then hot-swap declarative records and
 /// health targets. Socket-level changes still require a restart.
 fn apply_config_text(text: &str, reason: &str) -> Result<(), String> {
+    match apply_config_text_inner(text, reason) {
+        Ok(()) => Ok(()),
+        Err(message) => {
+            emit_alert(
+                AlertEvent::new(
+                    "lan-mdns",
+                    "warning",
+                    "config_reload_failed",
+                    "配置热重载失败，已保留旧配置",
+                    &message,
+                    reason,
+                )
+                .with_extra("reason", reason)
+                .with_cooldown(60),
+            );
+            Err(message)
+        }
+    }
+}
+
+fn apply_config_text_inner(text: &str, reason: &str) -> Result<(), String> {
     let flat = validate_text(text).map_err(|e| format!("common config invalid: {}", e))?;
-    let mut mdns =
-        MdnsConfig::from_flat(&flat).map_err(|e| format!("mdns config invalid: {}", e))?;
+    let mut mdns = match MdnsConfig::from_flat(&flat) {
+        Ok(value) => value,
+        Err(error) => {
+            emit_alert(
+                AlertEvent::new(
+                    "lan-mdns",
+                    "warning",
+                    "config_invalid",
+                    "配置校验失败",
+                    "热重载输入未通过离线校验",
+                    reason,
+                )
+                .with_extra("reason", reason)
+                .with_cooldown(60),
+            );
+            return Err(format!("mdns config invalid: {}", error));
+        }
+    };
     let state = STATE.get().ok_or("state not ready")?;
     let engine = ENGINE.get().ok_or("mDNS engine not ready")?;
     apply_overrides(&mut mdns);
     engine.reload(mdns.clone());
     state.health.replace_targets(mdns.health_targets.clone());
+    // F-G05 / F-E03: alert webhooks and gateway routes are hot-swappable.
+    if let Some(dispatcher) = ALERTS.get() {
+        dispatcher.reconfigure(alert_config_from_flat(&flat));
+    }
+    if let Some(gateway) = GATEWAY.get() {
+        gateway.reconfigure(&mdns.gateway);
+    }
     state.store.set_raw(text);
     state.store.inc_reloads();
     emit("info", &format!("config reloaded ({})", reason));
@@ -411,6 +675,12 @@ fn spawn_watchdog() {
             if let Some(state) = STATE.get() {
                 state.health.shutdown();
             }
+            if let Some(dispatcher) = ALERTS.get() {
+                dispatcher.shutdown();
+            }
+            if let Some(gateway) = GATEWAY.get() {
+                gateway.shutdown();
+            }
             emit("info", "shutdown signal received, goodbye sent");
             std::process::exit(0);
         }
@@ -420,11 +690,52 @@ fn spawn_watchdog() {
         // Cheap polling of the config file; content comparison prevents a
         // redundant reload right after our own atomic save.
         reload_from_disk();
-        if let Some(engine) = ENGINE.get() {
+        if let (Some(engine), Some(state)) = (ENGINE.get(), STATE.get()) {
             engine.purge_expired(unix_now(), 300.0);
+            scan_conflicts(engine, state);
         }
         std::thread::sleep(Duration::from_millis(500));
     });
+}
+
+/// F-G03: emit one canonical `name_conflict` event per newly observed
+/// conflict. The dispatcher's cooldown is the second line of defence.
+fn scan_conflicts(engine: &Engine, state: &State) {
+    let Some(mutex) = SEEN_CONFLICTS.get() else {
+        return;
+    };
+    let Ok(mut seen) = mutex.lock() else {
+        return;
+    };
+    let conflicts = state.conflicts(engine);
+    let current: std::collections::BTreeSet<String> = conflicts
+        .iter()
+        .map(|conflict| format!("{}|{}", conflict.name, conflict.rtype))
+        .collect();
+    for conflict in conflicts {
+        let key = format!("{}|{}", conflict.name, conflict.rtype);
+        if seen.insert(key.clone()) {
+            let source = conflict
+                .sources
+                .first()
+                .map(String::as_str)
+                .unwrap_or("unknown");
+            emit_alert(
+                AlertEvent::new(
+                    "lan-mdns",
+                    "warning",
+                    "name_conflict",
+                    "mDNS 名称冲突",
+                    &format!("{} 出现同名异值应答", conflict.name),
+                    &key,
+                )
+                .with_extra("name", &conflict.name)
+                .with_extra("source_ip", source)
+                .with_cooldown(300),
+            );
+        }
+    }
+    seen.retain(|key| current.contains(key));
 }
 
 fn unix_now() -> f64 {
@@ -447,7 +758,10 @@ fn declare_mdns_metrics(metrics: &Registry) {
     metrics.declare_gauge("conflicts", "Name conflicts currently registered");
     metrics.declare_gauge("config_history_versions", "Retained config snapshots");
     metrics.declare_gauge("auth_password_enabled", "Admin password initialized");
-    metrics.declare_gauge("gateway_enabled", "HTTP gateway global switch (M2.3)");
+    metrics.declare_gauge("gateway_enabled", "HTTP gateway global switch");
+    metrics.declare_gauge("alerts_queued", "Canonical events waiting for delivery");
+    metrics.declare_gauge("gateway_routes", "Registered static Host routes");
+    metrics.declare_counter("gateway_requests_total", "Gateway requests by result");
 }
 
 // ---------------------------------------------------------------- helpers
@@ -514,8 +828,32 @@ fn view_status(req: &Request, ctx: &Context) -> Response {
     let conflicts = ENGINE
         .get()
         .map_or(0, |engine| state.conflicts(engine).len());
+    let alert_status = state.alerts.status();
+    let alerts_json = format!(
+        "{{\"enabled\":{},\"webhooks\":{},\"queued\":{},\"sent\":{},\"failed\":{}}}",
+        alert_status.enabled,
+        alert_status.webhooks,
+        alert_status.queued,
+        alert_status.sent,
+        alert_status.failed
+    );
+    let gateway_json = match &state.gateway {
+        Some(gateway) => {
+            let stats = gateway.stats();
+            format!(
+                "{{\"enabled\":true,\"port\":{},\"routes\":{},\"requests\":{},\"forwarded\":{}}}",
+                gateway.port,
+                gateway.routes().len(),
+                stats.requests,
+                stats.forwarded
+            )
+        }
+        None => {
+            "{\"enabled\":false,\"port\":0,\"routes\":0,\"requests\":0,\"forwarded\":0}".to_string()
+        }
+    };
     let data = format!(
-        "{{\"component\":{},\"version\":{},\"running\":true,\"uptime\":{:.3},\"protocol\":{},\"records\":{},\"group\":{},\"mdns_port\":{},\"interface_mode\":{},\"queries\":{},\"responses\":{},\"ingested\":{},\"announces\":{},\"malformed\":{},\"bytes_in\":{},\"bytes_out\":{},\"security\":{{\"token_required\":{},\"password_set\":{},\"write_protection\":true}},\"history\":{{\"versions\":{},\"limit\":{}}},\"health\":{{\"up\":{},\"down\":{},\"unknown\":{}}},\"conflicts\":{},\"config_saves\":{},\"config_reloads\":{},\"alerts\":{{\"enabled\":false}},\"logs\":{{\"buffered\":{},\"capacity\":{},\"disk_bytes\":{},\"disk_limit_bytes\":{}}}}}",
+        "{{\"component\":{},\"version\":{},\"running\":true,\"uptime\":{:.3},\"protocol\":{},\"records\":{},\"group\":{},\"mdns_port\":{},\"interface_mode\":{},\"queries\":{},\"responses\":{},\"ingested\":{},\"announces\":{},\"malformed\":{},\"bytes_in\":{},\"bytes_out\":{},\"security\":{{\"token_required\":{},\"password_set\":{},\"write_protection\":true}},\"history\":{{\"versions\":{},\"limit\":{}}},\"health\":{{\"up\":{},\"down\":{},\"unknown\":{}}},\"conflicts\":{},\"config_saves\":{},\"config_reloads\":{},\"alerts\":{},\"gateway\":{},\"logs\":{{\"buffered\":{},\"capacity\":{},\"disk_bytes\":{},\"disk_limit_bytes\":{}}}}}",
         json_quote(&ctx.component),
         json_quote(&ctx.version),
         uptime,
@@ -541,6 +879,8 @@ fn view_status(req: &Request, ctx: &Context) -> Response {
         conflicts,
         state.store.saves(),
         state.store.reloads(),
+        alerts_json,
+        gateway_json,
         state.log_buffer.len(),
         state.log_buffer.capacity(),
         state.log_buffer.disk_bytes(),
@@ -604,7 +944,7 @@ fn view_metrics(_: &Request, ctx: &Context) -> Response {
         ctx.metrics.set(
             "gateway_enabled",
             &[],
-            if state.gateway_enabled { 1.0 } else { 0.0 },
+            if state.gateway.is_some() { 1.0 } else { 0.0 },
         );
         ctx.metrics
             .set_counter("config_saves_total", &[], state.store.saves());
@@ -621,6 +961,25 @@ fn view_metrics(_: &Request, ctx: &Context) -> Response {
             &[],
             state.log_buffer.disk_limit_bytes() as f64,
         );
+        let alerts = state.alerts.status();
+        ctx.metrics.set("alerts_queued", &[], alerts.queued as f64);
+        for ((kind, result), count) in &alerts.by_kind {
+            ctx.metrics.set_counter(
+                "alerts_sent_total",
+                &[("kind", kind), ("result", result)],
+                *count,
+            );
+        }
+        if let Some(gateway) = &state.gateway {
+            let stats = gateway.stats();
+            ctx.metrics
+                .set("gateway_routes", &[], gateway.routes().len() as f64);
+            ctx.metrics
+                .set_counter("gateway_requests_total", &[], stats.requests);
+        } else {
+            ctx.metrics.set("gateway_routes", &[], 0.0);
+            ctx.metrics.set_counter("gateway_requests_total", &[], 0);
+        }
     }
     Response::body(
         200,
@@ -856,11 +1215,50 @@ fn view_logs_stream(_: &Request, _: &Context) -> Response {
 }
 
 fn view_alerts(req: &Request, _: &Context) -> Response {
-    // Full dispatcher lands in M2.3; the endpoint and its state shape are
-    // part of the frozen M0 contract, so it is registered now.
+    let Some(dispatcher) = ALERTS.get() else {
+        return err(req, "internal_error", "alert dispatcher not ready", 503);
+    };
+    let status = dispatcher.status();
+    let kinds: Vec<String> = status
+        .by_kind
+        .iter()
+        .map(|((kind, result), count)| {
+            format!(
+                "{{\"kind\":{},\"result\":{},\"count\":{}}}",
+                json_quote(kind),
+                json_quote(result),
+                count
+            )
+        })
+        .collect();
+    let (gateway_enabled, gateway_routes, gateway_stats) = match GATEWAY.get() {
+        Some(gateway) => {
+            let stats = gateway.stats();
+            (true, gateway.routes().len(), stats)
+        }
+        None => (false, 0, gateway::GatewayStats::default()),
+    };
     ok(
         req,
-        "{\"enabled\":false,\"queued\":0,\"sent\":0,\"failed\":0,\"note\":\"M2.3\"}",
+        &format!(
+            "{{\"enabled\":{},\"webhooks\":{},\"queue_capacity\":{},\"queued\":{},\"sent\":{},\"failed\":{},\"dropped\":{},\"suppressed\":{},\"retries\":{},\"cooldown_seconds\":{},\"by_kind\":[{}],\"gateway\":{{\"enabled\":{},\"routes\":{},\"requests\":{},\"forwarded\":{},\"unreachable\":{}}}}}",
+            status.enabled,
+            status.webhooks,
+            common_alert::QUEUE_CAPACITY,
+            status.queued,
+            status.sent,
+            status.failed,
+            status.dropped,
+            status.suppressed,
+            status.retries,
+            status.cooldown_seconds,
+            kinds.join(","),
+            gateway_enabled,
+            gateway_routes,
+            gateway_stats.requests,
+            gateway_stats.forwarded,
+            gateway_stats.unreachable,
+        ),
     )
 }
 

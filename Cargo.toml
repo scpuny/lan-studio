@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "common/config",
     "common/crypto",
+    "common/alert",
     "common/dns",
     "common/net",
     "common/log",
@@ -23,6 +24,7 @@ rust-version = "1.75"
 [workspace.dependencies]
 common-config = { path = "common/config" }
 common-crypto = { path = "common/crypto" }
+common-alert = { path = "common/alert" }
 common-dns = { path = "common/dns" }
 common-net = { path = "common/net" }
 common-log = { path = "common/log" }

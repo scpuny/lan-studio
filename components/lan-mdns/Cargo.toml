@@ -4,11 +4,12 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Lan Studio mDNS component (M2.2 observability, security and config lifecycle)"
+description = "Lan Studio mDNS component (M2.3 alerting, HTTP gateway and deployment)"
 
 [dependencies]
 common-config = { workspace = true }
 common-crypto = { workspace = true }
+common-alert = { workspace = true }
 common-dns = { workspace = true }
 common-net = { workspace = true }
 common-log = { workspace = true }

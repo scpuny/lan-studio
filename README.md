@@ -3,11 +3,11 @@
 > 内网轻量 ZeroConf 与局域网运维工具箱。
 > 8 个 `lan-*` 组件，统一契约、独立二进制、独立 WebUI、可单独部署。
 
-**当前状态：M2.2 可观测 + 安全 + 配置生命周期完成**（2026-11-13）。`lan-mdns` 在真实
-mDNS/DNS-SD 引擎之上补齐了管理员密码写保护、配置保存 / 快照 / 历史 / 回滚 / 导入导出 /
-热重载、有界结构化日志与磁盘轮转、SSE 实时日志流、TCP 健康目标、名称冲突聚合、
-服务地图 TTL 老化，以及 [`docs/METRICS.md`](docs/METRICS.md) 第 3 节全部 13 个专有指标族。
-单测 62 项、运行态冒烟 **160 项**全绿。后续批次见
+**当前状态：M2.3 告警 + HTTP 网关 + 部署运维完成**（2026-11-13）。`lan-mdns` 在真实
+mDNS/DNS-SD 引擎与完整可观测 / 安全 / 配置生命周期之上，补齐了多平台告警 Webhook、
+健康翻转与冲突触发、内置静态 Host 网关与友好页、首次启动模板生成、Docker / Compose /
+systemd / 一键安装升级，以及自带健康检查探针。66 条功能全集已销项 **61 条**。
+单测 78 项、运行态冒烟 **221 项**全绿。逐条销项见
 [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md)。
 
 - 完整规格：[`docs/PRD.md`](docs/PRD.md)
@@ -19,32 +19,30 @@ mDNS/DNS-SD 引擎之上补齐了管理员密码写保护、配置保存 / 快�
 
 ```
 lan-studio/
-├── Cargo.toml             # workspace，11 个 member
+├── Cargo.toml             # workspace，12 个 member
 ├── docs/                  # 规格与字典
 │   ├── PRD.md             # 唯一权威规格书
 │   ├── M2-CHECKLIST.md    # 66 条功能逐条销项基线
-│   ├── METRICS.md
-│   ├── ALERT-SCHEMA.md
-│   ├── ERROR-CODES.md
-│   └── ADR/               # 架构决策记录（0001 M1 / 0002 M2.1 / 0003 M2.2）
+│   ├── METRICS.md  ALERT-SCHEMA.md  ERROR-CODES.md
+│   └── ADR/               # 0001 M1 / 0002 M2.1 / 0003 M2.2 / 0004 M2.3
 ├── contracts/             # 机器可读契约（语言无关）
-│   ├── openapi.yaml
-│   ├── config.schema.json
-│   ├── alert-event.json
-│   ├── log-record.json
-│   ├── snapshot.json
+│   ├── openapi.yaml  config.schema.json  alert-event.json
+│   ├── log-record.json  snapshot.json
 │   └── examples/          # 通过 schema 的示例
 ├── scripts/
 │   ├── verify_contracts.py # M0 契约校验
-│   └── smoke_mdns.py       # M2.1 + M2.2 运行态冒烟（160 项断言）
+│   ├── smoke_mdns.py       # M2.1 + M2.2 + M2.3 运行态冒烟（221 项断言）
+│   └── install.sh          # 一键安装 / --upgrade（保留配置与凭据）
 ├── common/                # 公共 crate
-│   ├── config/  crypto/  dns/  net/  log/  health/
+│   ├── config/  crypto/  alert/  dns/  net/  log/  health/
 │   └── auth/  metrics/  webui/  api/
 ├── components/
-│   └── lan-mdns/          # 真实引擎 + 内嵌 WebUI + 配置模板
+│   └── lan-mdns/          # 真实引擎 + 网关 + 内嵌 WebUI + 配置模板
+├── deploy/
+│   ├── Dockerfile  docker-compose.yml  lan-mdns.service
 ├── shell/                 # 统一出口（M5）
 └── .github/workflows/
-    ├── ci.yml             # 契约 + fmt/clippy/test + 产物冒烟
+    ├── ci.yml             # 契约 + fmt/clippy/test + 资产 + 产物冒烟
     └── release.yml        # musl 静态单文件 + sha256
 ```
 
@@ -89,7 +87,17 @@ curl --noproxy '*' -X POST -H 'Content-Type: application/json' \
   -d '{"name":"nas.local","type":"A"}' http://127.0.0.1:8080/api/probe
 ```
 
-`--cli` 模式不监听端口，离线校验配置并输出构建信息。
+单文件自举与运维子命令（均无需外部工具）：
+
+```bash
+./target/release/lan-mdns --version        # 版本 / 架构
+./target/release/lan-mdns --print-config   # 输出内嵌 YAML 模板
+./target/release/lan-mdns --validate       # 离线校验配置，不启动网络
+./target/release/lan-mdns --cli            # CLI 模式，不监听端口
+./target/release/lan-mdns --healthcheck    # 存活探针，供 Docker / systemd 调用
+```
+
+**首次启动**会在配置路径生成一次内嵌模板；已存在的配置永不覆盖（F-E09）。
 
 **写操作受管理员密码保护**（F-F02~F-F04）。首次未设置密码时所有写路由返回
 `409 setup_required`；先设置密码，再在请求头带 `X-Admin-Password`：
@@ -109,6 +117,56 @@ curl --noproxy '*' -X POST -H 'X-Admin-Password: change-me-now' \
 | `LAN_STUDIO_LOG_DIR` | `logs` | 轮转日志目录，磁盘硬上界 = `max_bytes × (backup_count + 1)` |
 | `LAN_STUDIO_HISTORY_DIR` | `config_history` | 配置快照目录，按 `observability.history_limit` 有界保留 |
 | `LAN_STUDIO_PORT` | `server.port`（8080） | 测试 / CI 端口覆盖钩子，生产以 YAML 为准 |
+| `LAN_MDNS_GATEWAY_PORT` | `mdns.gateway.port`（80） | 仅测试隔离用：覆盖网关监听端口 |
+
+## 告警与内置网关
+
+告警在 `alerts:` 段配置，规范事件由 `common-alert` 统一适配五类平台：
+
+```yaml
+alerts:
+  enabled: true
+  webhooks:
+    - "https://oapi.dingtalk.com/robot/send?access_token=..."
+  cooldown_seconds: 300
+  timeout_seconds: 5.0
+  max_retries: 2
+```
+
+`http://` Webhook 由标准库直接发送；`https://` 公网 Webhook 通过系统 `curl` 桥接
+（仅此时需要 curl，组件本体仍是零依赖单文件）。`/api/alerts` 可查队列、发送 / 失败
+计数与按 `kind` 统计。
+
+网关默认**关闭**，不会抢占 80 端口；开启后只对已登记域名做静态 Host 路由：
+
+```yaml
+mdns:
+  gateway:
+    enabled: true
+    port: 80
+    admin_host: "mdns.local"
+    hosts:
+      - host: printer.local
+        target: "192.168.5.30:80"
+        proxy: true
+```
+
+已发布服务（其 `host` 有对应 A 记录）自动登记为路由，`services[].proxy` 与
+`hosts[].proxy` 是每服务开关。未登记返回 404 友好页，目标不可达返回 502 友好页并
+发出 `gateway_target_unreachable` 告警；`/go/` 提供最小导航入口。
+
+## 部署
+
+```bash
+# Docker Compose（host 网络是 mDNS 的硬约束）
+docker compose -f deploy/docker-compose.yml up -d --build
+docker compose -f deploy/docker-compose.yml logs -f
+
+# 裸机 / systemd
+sudo ./scripts/install.sh                 # 首次安装
+sudo ./scripts/install.sh --upgrade       # 升级：保留配置 / 凭据 / 日志 / 快照
+sudo ./scripts/install.sh --from ./dist   # 使用本地发布目录
+```
 
 运行态冒烟（自动使用隔离组播组、高位端口与独立临时数据目录，不向真实 LAN 发包）：
 
@@ -118,8 +176,9 @@ python3 scripts/smoke_mdns.py
 
 设计取舍见
 [`docs/ADR/0001-m1-skeleton-decisions.md`](docs/ADR/0001-m1-skeleton-decisions.md)、
-[`docs/ADR/0002-m2-1-protocol-kernel.md`](docs/ADR/0002-m2-1-protocol-kernel.md) 与
-[`docs/ADR/0003-m2-2-observability-security.md`](docs/ADR/0003-m2-2-observability-security.md)。
+[`docs/ADR/0002-m2-1-protocol-kernel.md`](docs/ADR/0002-m2-1-protocol-kernel.md)、
+[`docs/ADR/0003-m2-2-observability-security.md`](docs/ADR/0003-m2-2-observability-security.md) 与
+[`docs/ADR/0004-m2-3-alerting-gateway-deploy.md`](docs/ADR/0004-m2-3-alerting-gateway-deploy.md)。
 
 ## 里程碑
 
@@ -127,7 +186,7 @@ python3 scripts/smoke_mdns.py
 | --- | --- | --- |
 | M0 | 契约冻结（本目录全部内容） | **完成** |
 | M1 | monorepo 骨架、`common-*` 最小集、CI、单文件产物 | **完成** |
-| M2 | `lan-mdns` 功能全集 66 条逐条销项 | **进行中（M2.1 + M2.2 完成，43/66）** |
+| M2 | `lan-mdns` 功能全集 66 条逐条销项 | **进行中（M2.1 + M2.2 + M2.3 完成，61/66）** |
 | M3 | 其余 P0：`lan-relay` / `lan-ca` / `lan-scan` | 待启动 |
 | M4 | P1：`lan-hosts` / `lan-wol` | 待启动 |
 | M5 | P2：`lan-sync` / `lan-ssdp` + 统一出口 + 生态 DoD | 待启动 |
@@ -137,6 +196,7 @@ python3 scripts/smoke_mdns.py
 - 契约以 `contracts/` 下机器可读文件为准，文字描述冲突时以契约文件为准。
 - 仓库：`https://github.com/scpuny/lan-studio.git`，`origin/main`。
 - 既有 mDNS 服务已进入维护阶段（仅修缺陷、不接新需求），其功能由 `lan-mdns` 承接。
-- 告警、内置 HTTP 网关、容器 / systemd / 安装脚本在 M2.3 销项；Arco Design 正式管理台、
-  健康状态灯、在线配置表单与全量 DoD 在 M2.4 销项。
-- `LAN_MDNS_GROUP` / `LAN_MDNS_PORT` 仅用于测试隔离；生产组播地址与端口永远取自 YAML。
+- M2.4 收尾：Arco Design 正式管理台、健康状态灯、在线配置表单、API 契约测试与
+  66 条全部销项 + PRD 8.1 组件级 DoD。
+- `LAN_MDNS_GROUP` / `LAN_MDNS_PORT` / `LAN_MDNS_GATEWAY_PORT` 仅用于测试隔离；
+  生产组播地址、mDNS 端口与网关端口永远取自 YAML。

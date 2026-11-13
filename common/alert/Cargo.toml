@@ -1,0 +1,9 @@
+[package]
+name = "common-alert"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Canonical alert events, platform adapters and bounded dispatcher (PRD 3.4)"
+
+[dependencies]
