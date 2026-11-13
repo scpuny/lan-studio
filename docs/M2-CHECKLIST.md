@@ -1,0 +1,206 @@
+# M2 销项清单：`lan-mdns` 功能全集
+
+> 依据 `docs/PRD.md` 第 5 章（66 条）与 7.6「附录 A 逐条核对，缺一不可收尾」。
+> 本表是 M2 的**唯一收尾依据**：只有 66 条全部 `done`、且 PRD 8.1 组件级 DoD 全过，M2 才算完成。
+> 状态：`pending` 未开始 / `wip` 实现中 / `done` 已通过验收。
+
+## 1. 批次划分
+
+| 批次 | 主题 | 主要交付 | 状态 |
+| --- | --- | --- | --- |
+| **M2.1** | 协议内核 + 配置内核 + mDNS 引擎 | `common-dns` 报文编解码、`common-config` 完整解析、`common-net` 组播收发、`lan-mdns` 真实应答/宣告/探针/摄取；离线报文单测 + 组播闭环 | **done** |
+| **M2.2** | 可观测 + 安全 + 配置生命周期 | 查询审计 / 冲突检测 / 服务地图 / 健康监控 / 状态灯 / SSE / 日志轮转；配置保存·快照·回滚·导入导出·热重载；管理员密码与写保护 | pending |
+| **M2.3** | 告警 + HTTP 网关 + 部署运维 | 多平台 Webhook + 冷却重试；静态 Host 网关 + 友好页；Docker / compose / systemd / install.sh / 探针 | pending |
+| **M2.4** | WebUI + 全量销项 + DoD | 离线正式管理台、端到端与 API 契约测试、CI 门禁、66 条全部 `done`、PRD 8.1 组件级 DoD | pending |
+
+## 2. 66 条逐条销项
+
+### A. 名称解析与发布（12）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-A01 | 静态域名 → IPv4 地址映射发布 | M2.1 | done |
+| F-A02 | IPv6 地址记录发布 | M2.1 | done |
+| F-A03 | 自定义 TXT 记录随服务发布 | M2.1 | done |
+| F-A04 | `.local` 名称合法性校验（含多段标签） | M2.1 | done |
+| F-A05 | IPv4 反向 PTR 发布 | M2.1 | done |
+| F-A06 | 记录 TTL 可配置 | M2.1 | done |
+| F-A07 | 启动时主动宣告（次数 / 间隔可配） | M2.1 | done |
+| F-A08 | 周期性主动宣告 | M2.1 | done |
+| F-A09 | 退出时发送 Goodbye | M2.1 | done |
+| F-A10 | Known-Answer 抑制 / 缓存刷新 | M2.1 | done |
+| F-A11 | QU 位单播应答 | M2.1 | done |
+| F-A12 | 多网卡绑定（指定 / 自动 / 全部枚举） | M2.2 | pending |
+
+### B. 服务发现 DNS-SD（6）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-B01 | 服务实例发布（PTR / SRV / TXT） | M2.1 | done |
+| F-B02 | 服务类型枚举 | M2.1 | done |
+| F-B03 | 自定义服务端口与主机 | M2.1 | done |
+| F-B04 | 外来应答摄取与解析（A/AAAA/PTR/SRV/TXT） | M2.1 | done |
+| F-B05 | 局域网服务地图（按类型聚合，TTL 过期清理） | M2.2 | pending |
+| F-B06 | 主动探针（指定名称 / 类型，单播或组播） | M2.1 | done |
+
+### C. 网络与协议（6）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-C01 | 标准组播地址与端口收发 | M2.1 | done |
+| F-C02 | 组播地址 / 端口可配置（隔离测试） | M2.1 | done |
+| F-C03 | 与系统 mDNS 守护进程共存 | M2.2 | pending |
+| F-C04 | 自身应答回环排除 | M2.1 | done |
+| F-C05 | DNS 报文编解码（含名称压缩） | M2.1 | done |
+| F-C06 | 全链路有界资源 | M2.2 | pending |
+
+### D. 可观测（8）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-D01 | 查询审计日志（时间 / 来源 / 名称 / 类型） | M2.2 | pending |
+| F-D02 | 名称冲突检测（同名异值、来源登记、老化清理） | M2.2 | pending |
+| F-D03 | 目标健康监控（TCP：up / down / unknown） | M2.2 | pending |
+| F-D04 | 健康状态灯与列表 | M2.4 | pending |
+| F-D05 | 实时日志流（SSE） | M2.2 | pending |
+| F-D06 | 日志轮转与磁盘硬上界 | M2.2 | pending |
+| F-D07 | 运行状态与统计 | M2.2 | pending |
+| F-D08 | Prometheus 指标（全部必备族） | M2.2 | pending |
+
+### E. 配置与生命周期（9）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-E01 | 声明式配置文件（符合 3.1） | M2.1 | done |
+| F-E02 | 离线配置校验（不启动网络） | M2.1 | done |
+| F-E03 | 配置热重载（文件变更 / 信号 / 手动） | M2.2 | pending |
+| F-E04 | 在线配置编辑（表单 + 源码双模式） | M2.4 | pending |
+| F-E05 | 保存链路：校验 → 快照 → 原子替换 → 热重载 | M2.2 | pending |
+| F-E06 | 配置版本快照（自动、有界、带原因标记） | M2.2 | pending |
+| F-E07 | 一键回滚 | M2.2 | pending |
+| F-E08 | 配置导入 / 导出 | M2.2 | pending |
+| F-E09 | 首次启动模板生成 + 配置持久化 | M2.3 | pending |
+
+### F. 安全（5）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-F01 | Admin Token 鉴权 | M2.2 | pending |
+| F-F02 | 管理员密码保护写操作、可修改 | M2.2 | pending |
+| F-F03 | 密码摘要存储（加盐哈希、常量时间校验、文件权限） | M2.2 | pending |
+| F-F04 | 未初始化时写操作拒绝（409 setup_required） | M2.2 | pending |
+| F-F05 | 管理接口默认仅本机监听 | M2.2 | pending |
+
+### G. 告警（5）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-G01 | 多平台 Webhook（钉钉 / 飞书 / Slack / 企业微信 / 通用 JSON） | M2.3 | pending |
+| F-G02 | 健康状态翻转触发 | M2.3 | pending |
+| F-G03 | 名称冲突触发 | M2.3 | pending |
+| F-G04 | 冷却去重 + 失败重试（≤2 次）+ 有界队列 | M2.3 | pending |
+| F-G05 | 告警配置热更新与状态查询 | M2.3 | pending |
+
+### H. 网关与辅助入口（5）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-H01 | 内置 HTTP 网关（已登记域名静态 Host 路由） | M2.3 | pending |
+| F-H02 | 全局开关 + 每服务代理开关 | M2.3 | pending |
+| F-H03 | 管理台统一域名入口 | M2.3 | pending |
+| F-H04 | 友好错误页（未登记 / 目标不可达） | M2.3 | pending |
+| F-H05 | 辅助跳转入口 | M2.4 | pending |
+
+### I. 部署与运维（7）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-I01 | 单文件发布、零外部运行时依赖 | M2.3 | pending |
+| F-I02 | `webui` / `cli` 双模式 | M2.3 | pending |
+| F-I03 | 容器镜像 + 编排文件（host 网络硬约束） | M2.3 | pending |
+| F-I04 | 系统服务单元 | M2.3 | pending |
+| F-I05 | 一键安装脚本 + 升级（保留配置与日志） | M2.3 | pending |
+| F-I06 | 数据卷持久化 | M2.3 | pending |
+| F-I07 | 健康检查探针 | M2.3 | pending |
+
+### J. 质量保障（3）
+
+| 编号 | 能力 | 批次 | 状态 |
+| --- | --- | --- | --- |
+| F-J01 | 离线报文单元测试 | M2.1 | done |
+| F-J02 | 真实组播端到端测试 | M2.1 | done |
+| F-J03 | 管理 API 契约测试 + CI 门禁 | M2.4 | pending |
+
+**合计：10 个能力域 / 66 条。**
+
+## 3. 契约端点对照（22 个，`contracts/openapi.yaml`）
+
+| 批次 | 需补齐的端点 |
+| --- | --- |
+| M1 已有 | `/healthz`、`/readyz`、`/api/status`、`/api/metrics`、`/api/config`(GET)、`/api/auth` |
+| M2.1（已交付） | `/api/records`、`/api/probe`、`/api/interfaces`；额外提前提供只读的 `/api/queries`、`/api/browse` |
+| M2.2 | `/api/config`(POST)、`/api/config/snapshot`、`/api/config/history`、`/api/config/rollback`、`/api/reload`、`/api/logs`、`/api/logs/stream`、`/api/health/targets`、`/api/queries`、`/api/browse`、`/api/conflicts`、`/api/auth/password`、`/api/auth/verify` |
+| M2.3 | `/api/alerts` |
+
+## 4. 进度摘要
+
+| 日期 | 批次 | 完成条数 | 累计 | 说明 |
+| --- | --- | --- | --- | --- |
+| 2026-11-13 | M2.1 | 0 | 0/66 | 建立销项基线 |
+| 2026-11-13 | M2.1 | 24 | 24/66 | 协议内核 + 配置内核 + 真实 mDNS 引擎验收通过 |
+
+## 5. M2.1 验收记录（2026-11-13）
+
+### 5.1 销项明细
+
+本批次 `done` 共 24 条：`F-A01`~`F-A11`（11）、`F-B01`~`F-B04` + `F-B06`（5）、
+`F-C01` / `F-C02` / `F-C04` / `F-C05`（4）、`F-E01` / `F-E02`（2）、
+`F-J01` / `F-J02`（2）。
+
+### 5.2 提前交付但**不提前销项**的能力
+
+以下能力在 M2.1 已有可运行实现，但完整语义（TTL 聚合、老化、UI、热重载、真实
+守护进程共存实测等）仍属 M2.2，故对应条目保持 `pending`：
+
+| 条目 | M2.1 已提供 | 待 M2.2 补齐 |
+| --- | --- | --- |
+| F-A12 | `interface_mode: auto/all/specified` + `mdns.interfaces[]`，传输层逐网卡加入组播 | 管理台表单、热重载 |
+| F-B05 | `/api/browse` 外来应答摄取（有界队列） | 按服务类型聚合、TTL 过期清理、冲突关联 |
+| F-C03 | raw fd 在 bind 前置 `SO_REUSEPORT` | 与 avahi / systemd-resolved 同机实测 |
+| F-C06 | `MAX_QUERIES` / `MAX_OBSERVED` / `MAX_BUFFER` 有界队列 | 日志、快照、告警队列的全链路上界 |
+| F-D01 | `/api/queries` 时间 / 来源 / 名称 / 类型，上限 `?limit=1..1000` | SSE、导出、老化策略 |
+| F-D07 | `/api/status` 引擎计数（queries / responses / ingested / announces / malformed） | 健康目标、配置版本等状态位 |
+| F-D08 | 9 个必备族 + 7 个引擎专有族 | 其余 7 个专有族（见 `docs/METRICS.md` 第 3 节） |
+| F-F01 | Admin Token 鉴权（M1 已有，冒烟验证 401 / 403 / 200） | 管理员密码写保护（`F-F02`~`F-F05`） |
+
+### 5.3 验收证据
+
+| 门禁 | 结果 |
+| --- | --- |
+| M0 契约校验（完整模式） | 21 passed / 0 failed |
+| `cargo fmt --all -- --check` | 通过 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | 通过 |
+| `cargo test --workspace` | 36 passed / 0 failed |
+| `cargo build --release -p lan-mdns` | 成功，单文件约 997 KB |
+| `python3 scripts/smoke_mdns.py` | **62 passed / 0 failed** |
+| 真实组播闭环 | A / PTR / QU 三种探针均取回本引擎发布的 RR；优雅退出广播 Goodbye |
+
+冒烟脚本自动使用隔离组播组 `239.1.2.3` 与高位端口 `15353` / `15354`，不向真实
+LAN 发送 `224.0.0.251:5353` 流量；技术取舍见 `docs/ADR/0002-m2-1-protocol-kernel.md`。
+
+### 5.4 缺陷与修复记录
+
+1. `Engine::start()` 中 `Arc<Engine>` 被 `thread::spawn` 移动后又借用，编译失败 → 改用
+   独立 `worker` 变量持有克隆，`engine` 仅用于登记 `JoinHandle`。
+2. 指标短名误加 `mdns_` 前缀，产出 `lanstudio_mdns_mdns_records` 双前缀 → 改为
+   `records` / `queries_total` 等，并加冒烟断言第 27 项防回归。
+3. QU 单播探针绑定共享端口时，Linux 在 `SO_REUSEPORT` 组内把单播应答分发回引擎
+   socket，探针收不到 → QU 模式改绑临时端口并显式发往 `group:mdns.port`。
+4. `--cli` 曾打印测试覆盖后的组播地址 / 端口 → 把覆盖移到运行引擎之前，CLI 始终
+   报告配置文件自身的值。
+
+### 5.5 M2.2 入口
+
+下一批：`F-A12`、`F-B05`、`F-C03`、`F-C06`、`F-D01`~`F-D08`、`F-E03`~`F-E08`、
+`F-F01`~`F-F05`；同时把 `LAN_STUDIO_PORT` 收回 `config.schema.json`，并补齐
+`docs/METRICS.md` 第 3 节剩余 7 个指标族。

@@ -27,20 +27,27 @@ footer{margin-top:32px;color:var(--muted);font-size:13px}
 <body>
 <main>
 <h1>Lan Studio</h1>
-<p class="sub">lan-mdns · M1 骨架 · 内嵌离线页面</p>
+<p class="sub">lan-mdns · M2.1 协议内核 · 内嵌离线页面</p>
 
 <div class="card">
 <p>本页由二进制编译期内嵌，运行时不依赖任何外部静态文件、CDN 或网络。</p>
-<p>当前里程碑 <strong>M1</strong>：Cargo workspace、common 公共 crate、CI / release 流水线、单文件产物已就绪。按 PRD 7.5，<strong>mDNS 协议在 M2 实现</strong>，当前为空壳。</p>
+<p>当前里程碑 <strong>M2.1</strong>：真实 mDNS / DNS-SD 引擎已上线——组播收发、查询应答、启动与周期宣告、退出 Goodbye、QU 单播应答、Known-Answer 抑制、外来应答摄取与主动探针。</p>
+<p><strong>本页仍是占位页</strong>。按 PRD 7.5，Arco Design 正式管理台在 M2.4 交付；可观测、配置生命周期、告警与网关分别在 M2.2 / M2.3 上线。</p>
 </div>
 
 <h2>已实现的契约端点</h2>
 <ul>
 <li><a href="/healthz"><code>GET /healthz</code></a> <span>存活探针，恒返回 ok</span></li>
 <li><a href="/readyz"><code>GET /readyz</code></a> <span>就绪探针</span></li>
-<li><a href="/api/status"><code>GET /api/status</code></a> <span>运行状态与统计</span></li>
+<li><a href="/api/status"><code>GET /api/status</code></a> <span>协议状态与引擎统计</span></li>
 <li><a href="/api/metrics"><code>GET /api/metrics</code></a> <span>Prometheus 0.0.4 指标</span></li>
 <li><a href="/api/config"><code>GET /api/config</code></a> <span>当前配置原文</span></li>
+<li><a href="/api/auth"><code>GET /api/auth</code></a> <span>鉴权状态</span></li>
+<li><a href="/api/records"><code>GET /api/records</code></a> <span>已发布 RR 集合</span></li>
+<li><a href="/api/interfaces"><code>GET /api/interfaces</code></a> <span>本机网卡枚举</span></li>
+<li><a href="/api/queries"><code>GET /api/queries</code></a> <span>有界查询审计</span></li>
+<li><a href="/api/browse"><code>GET /api/browse</code></a> <span>外来应答摄取</span></li>
+<li><code>POST /api/probe</code> <span>主动探针（name / type / unicast）</span></li>
 </ul>
 
 <h2>权威契约</h2>

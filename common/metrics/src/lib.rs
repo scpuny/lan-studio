@@ -110,9 +110,29 @@ impl Registry {
         );
     }
 
+    /// Let a component register additional families from docs/METRICS.md
+    /// without hard-coding component names into this common crate.
+    pub fn declare_gauge(&self, short: &str, help: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.declare(short, "gauge", help);
+    }
+
+    pub fn declare_counter(&self, short: &str, help: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.declare(short, "counter", help);
+    }
+
     pub fn set(&self, short: &str, labels: &[(&str, &str)], value: f64) {
         let mut inner = self.inner.lock().unwrap();
         inner.set(short, labels, value);
+    }
+
+    /// Publish an absolute snapshot of an internal counter (the engine owns
+    /// the authoritative value, so we cannot use incremental `inc` here).
+    pub fn set_counter(&self, short: &str, labels: &[(&str, &str)], value: u64) {
+        let mut inner = self.inner.lock().unwrap();
+        let key = inner.sample_key(short, labels);
+        inner.counters.insert(key, value);
     }
 
     pub fn inc(&self, short: &str, labels: &[(&str, &str)], delta: u64) {

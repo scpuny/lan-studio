@@ -1,11 +1,13 @@
-//! Minimal configuration loader for the M1 skeleton.
+//! Configuration loader for the Lan Studio unified schema.
 //!
-//! M1 deliberately ships zero third-party crates. This module parses the small
-//! YAML subset used by `contracts/examples/config.sample.yaml` (top-level
-//! scalars plus one level of sections). See docs/ADR/0001 for the M2 plan to
-//! replace it with a full YAML implementation aligned to config.schema.json.
+//! Zero third-party crates. The parser handles the YAML subset used by
+//! `contracts/config.schema.json`: nested maps, inline scalars, quoted values,
+//! comments, and lists of maps (`records` / `services`). List items are
+//! flattened into `prefix[0].field` keys so callers need no YAML AST.
+//! See docs/ADR/0001 for the M1 decision and its M2 extension.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::fs;
 
 #[derive(Debug, Clone)]
@@ -32,6 +34,21 @@ impl Default for Config {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigError {
+    pub code: &'static str,
+    pub field: String,
+    pub detail: String,
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {} ({})", self.code, self.field, self.detail)
+    }
+}
+
+impl std::error::Error for ConfigError {}
 
 fn strip_comment(line: &str) -> &str {
     let mut in_single = false;
@@ -60,10 +77,21 @@ fn unquote(value: &str) -> String {
     value.to_string()
 }
 
-/// Flatten a small YAML document into dotted keys, e.g. `server.listen`.
+#[derive(Debug)]
+struct Frame {
+    indent: usize,
+    prefix: String,
+    next_index: usize,
+}
+
+/// Flatten a YAML document into dotted keys. Lists become `prefix[i].field`.
 pub fn parse_flat(text: &str) -> HashMap<String, String> {
     let mut out = HashMap::new();
-    let mut section = String::new();
+    let mut stack: Vec<Frame> = vec![Frame {
+        indent: 0,
+        prefix: String::new(),
+        next_index: 0,
+    }];
     for raw_line in text.lines() {
         let line = strip_comment(raw_line).trim_end();
         if line.trim().is_empty() {
@@ -71,27 +99,156 @@ pub fn parse_flat(text: &str) -> HashMap<String, String> {
         }
         let indent = line.len() - line.trim_start().len();
         let body = line.trim();
+        while stack.len() > 1 && indent <= stack.last().map_or(0, |f| f.indent) {
+            stack.pop();
+        }
+        let parent = stack.last().map_or("", |f| f.prefix.as_str()).to_string();
+
+        if let Some(item) = body.strip_prefix("- ") {
+            let item_prefix = {
+                let frame = stack.last_mut().expect("root frame");
+                let index = frame.next_index;
+                frame.next_index += 1;
+                format!("{}[{}]", frame.prefix, index)
+            };
+            if let Some((key, value)) = item.split_once(':') {
+                let full = format!("{}.{}", item_prefix, key.trim());
+                if value.trim().is_empty() {
+                    stack.push(Frame {
+                        indent,
+                        prefix: full,
+                        next_index: 0,
+                    });
+                    continue;
+                }
+                out.insert(full, unquote(value));
+            } else {
+                out.insert(item_prefix.clone(), unquote(item));
+            }
+            stack.push(Frame {
+                indent,
+                prefix: item_prefix,
+                next_index: 0,
+            });
+            continue;
+        }
+
         if let Some((key, value)) = body.split_once(':') {
             let key = key.trim();
             let value = value.trim();
-            if indent == 0 {
-                if value.is_empty() {
-                    section = key.to_string();
-                } else {
-                    out.insert(key.to_string(), unquote(value));
-                    section.clear();
-                }
+            let full = if parent.is_empty() {
+                key.to_string()
             } else {
-                let full = if section.is_empty() {
-                    key.to_string()
-                } else {
-                    format!("{}.{}", section, key)
-                };
+                format!("{}.{}", parent, key)
+            };
+            if value.is_empty() {
+                stack.push(Frame {
+                    indent,
+                    prefix: full,
+                    next_index: 0,
+                });
+            } else if value == "[]" || value == "{}" {
+                out.insert(full, String::new());
+            } else {
                 out.insert(full, unquote(value));
             }
         }
     }
     out
+}
+
+pub fn get_str(flat: &HashMap<String, String>, key: &str, default: &str) -> String {
+    flat.get(key)
+        .filter(|value| !value.is_empty())
+        .cloned()
+        .unwrap_or_else(|| default.to_string())
+}
+
+pub fn get_bool(flat: &HashMap<String, String>, key: &str, default: bool) -> bool {
+    flat.get(key)
+        .map(|value| value.eq_ignore_ascii_case("true") || value == "1")
+        .unwrap_or(default)
+}
+
+pub fn get_u16(flat: &HashMap<String, String>, key: &str, default: u16) -> u16 {
+    flat.get(key)
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(default)
+}
+
+pub fn get_u32(flat: &HashMap<String, String>, key: &str, default: u32) -> u32 {
+    flat.get(key)
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(default)
+}
+
+pub fn get_u64(flat: &HashMap<String, String>, key: &str, default: u64) -> u64 {
+    flat.get(key)
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(default)
+}
+
+/// Number of list items under `prefix`, derived from `prefix[i].*` keys.
+pub fn list_len(flat: &HashMap<String, String>, prefix: &str) -> usize {
+    let marker = format!("{}[", prefix);
+    let mut indices: Vec<usize> = flat
+        .keys()
+        .filter_map(|key| key.strip_prefix(&marker))
+        .filter_map(|tail| tail.split(']').next())
+        .filter_map(|index| index.parse::<usize>().ok())
+        .collect();
+    indices.sort_unstable();
+    indices.dedup();
+    indices.last().map_or(0, |last| last + 1)
+}
+
+/// Offline validation of the common schema segments (F-E02). No network is
+/// touched, so it is safe to run before binding any socket.
+pub fn validate_common(flat: &HashMap<String, String>) -> Result<(), ConfigError> {
+    let bad = |field: &str, detail: &str| ConfigError {
+        code: "invalid_config",
+        field: field.to_string(),
+        detail: detail.to_string(),
+    };
+
+    let version = get_str(flat, "version", "");
+    if version != "1" {
+        return Err(bad("version", "must be 1"));
+    }
+    let component = get_str(flat, "component", "");
+    let valid_component = component.starts_with("lan-")
+        && component.len() > 4
+        && component
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-');
+    if !valid_component {
+        return Err(bad("component", "must match ^lan-[a-z0-9-]+$"));
+    }
+    let level = get_str(flat, "server.log_level", "info");
+    if !["debug", "info", "warning", "error"].contains(&level.as_str()) {
+        return Err(bad("server.log_level", "invalid log level"));
+    }
+    let log_level = get_str(flat, "logging.level", "info");
+    if !["debug", "info", "warning", "error"].contains(&log_level.as_str()) {
+        return Err(bad("logging.level", "invalid log level"));
+    }
+    let history = get_u32(flat, "observability.history_limit", 30);
+    if !(1..=1000).contains(&history) {
+        return Err(bad("observability.history_limit", "must be 1..1000"));
+    }
+    let max_bytes = get_u64(flat, "logging.max_bytes", 1_048_576);
+    if max_bytes < 1024 {
+        return Err(bad("logging.max_bytes", "must be >= 1024"));
+    }
+    let backups = get_u32(flat, "logging.backup_count", 3);
+    if backups > 100 {
+        return Err(bad("logging.backup_count", "must be <= 100"));
+    }
+    let retries = get_u32(flat, "alerts.max_retries", 2);
+    if retries > 2 {
+        return Err(bad("alerts.max_retries", "must be <= 2"));
+    }
+    Ok(())
 }
 
 pub fn apply_flat(cfg: &mut Config, flat: &HashMap<String, String>) {
@@ -107,7 +264,7 @@ pub fn apply_flat(cfg: &mut Config, flat: &HashMap<String, String>) {
         cfg.listen = value.clone();
     }
     if let Some(value) = flat.get("server.webui") {
-        cfg.webui = value.eq_ignore_ascii_case("true");
+        cfg.webui = value.eq_ignore_ascii_case("true") || value == "1";
     }
     if let Some(value) = flat.get("server.admin_token") {
         cfg.admin_token = value.clone();
@@ -129,8 +286,15 @@ pub fn load(path: &str) -> Config {
     cfg
 }
 
-/// M1 keeps the listening port out of the frozen config schema; it is supplied
-/// by the environment. M2 will fold it into config.schema.json properly.
+/// Parse and validate a config text without binding any socket (F-E02).
+pub fn validate_text(text: &str) -> Result<HashMap<String, String>, ConfigError> {
+    let flat = parse_flat(text);
+    validate_common(&flat)?;
+    Ok(flat)
+}
+
+/// M1 keeps the listening port out of the frozen config schema; it is
+/// supplied by the environment. M2 will fold it into config.schema.json.
 pub fn port_from_env() -> u16 {
     std::env::var("LAN_STUDIO_PORT")
         .ok()
@@ -174,5 +338,82 @@ mod tests {
         assert_eq!(cfg.component, "lan-relay");
         assert_eq!(cfg.listen, "0.0.0.0");
         assert!(!cfg.webui);
+    }
+
+    #[test]
+    fn parses_list_of_maps_into_indexed_keys() {
+        let text = "\
+mdns:
+  records:
+    - name: nas.local
+      type: A
+      value: 192.168.5.10
+      ttl: 120
+    - name: printer.local
+      type: A
+      value: 192.168.5.11
+  services:
+    - instance: Web Server
+      type: _http._tcp.local
+      host: nas.local
+      port: 8080
+  ttl: 90
+";
+        let flat = parse_flat(text);
+        assert_eq!(flat.get("mdns.records[0].name").unwrap(), "nas.local");
+        assert_eq!(flat.get("mdns.records[0].type").unwrap(), "A");
+        assert_eq!(flat.get("mdns.records[1].name").unwrap(), "printer.local");
+        assert_eq!(flat.get("mdns.services[0].port").unwrap(), "8080");
+        assert_eq!(flat.get("mdns.ttl").unwrap(), "90");
+        assert_eq!(list_len(&flat, "mdns.records"), 2);
+        assert_eq!(list_len(&flat, "mdns.services"), 1);
+        assert_eq!(list_len(&flat, "mdns.missing"), 0);
+    }
+
+    #[test]
+    fn empty_inline_lists_are_safe() {
+        let flat = parse_flat("alerts:\n  webhooks: []\nmdns:\n  interfaces: []\n");
+        assert_eq!(flat.get("alerts.webhooks").unwrap(), "");
+        assert_eq!(list_len(&flat, "mdns.interfaces"), 0);
+    }
+
+    #[test]
+    fn typed_getters_fall_back_on_bad_values() {
+        let flat = parse_flat("mdns:\n  ttl: abc\n  announce: 7\n");
+        assert_eq!(get_u32(&flat, "mdns.ttl", 120), 120);
+        assert_eq!(get_u16(&flat, "mdns.announce", 3), 7);
+        assert!(!get_bool(&flat, "mdns.enabled", false));
+        assert_eq!(get_str(&flat, "mdns.group", "224.0.0.251"), "224.0.0.251");
+    }
+
+    #[test]
+    fn offline_validation_accepts_template_and_rejects_bad_fields() {
+        let good = "version: 1\ncomponent: lan-mdns\nserver:\n  webui: true\n  log_level: info\n";
+        assert!(validate_text(good).is_ok());
+        let cases = [
+            ("version: 2\ncomponent: lan-mdns\n", "version"),
+            ("version: 1\ncomponent: BadName\n", "component"),
+            (
+                "version: 1\ncomponent: lan-mdns\nserver:\n  log_level: trace\n",
+                "server.log_level",
+            ),
+            (
+                "version: 1\ncomponent: lan-mdns\nlogging:\n  max_bytes: 10\n",
+                "logging.max_bytes",
+            ),
+            (
+                "version: 1\ncomponent: lan-mdns\nalerts:\n  max_retries: 9\n",
+                "alerts.max_retries",
+            ),
+            (
+                "version: 1\ncomponent: lan-mdns\nobservability:\n  history_limit: 0\n",
+                "observability.history_limit",
+            ),
+        ];
+        for (text, field) in cases {
+            let err = validate_text(text).unwrap_err();
+            assert_eq!(err.code, "invalid_config");
+            assert_eq!(err.field, field);
+        }
     }
 }

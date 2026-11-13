@@ -21,6 +21,10 @@ name = "common-config"
 version = "0.1.0"
 
 [[package]]
+name = "common-dns"
+version = "0.1.0"
+
+[[package]]
 name = "common-health"
 version = "0.1.0"
 
@@ -30,6 +34,10 @@ version = "0.1.0"
 
 [[package]]
 name = "common-metrics"
+version = "0.1.0"
+
+[[package]]
+name = "common-net"
 version = "0.1.0"
 
 [[package]]
@@ -43,8 +51,10 @@ dependencies = [
  "common-api",
  "common-auth",
  "common-config",
+ "common-dns",
  "common-health",
  "common-log",
  "common-metrics",
+ "common-net",
  "common-webui",
 ]

@@ -28,4 +28,29 @@ mdns:
   group: "224.0.0.251"
   port: 5353
   ttl: 120
-  announce_interval: 60
+  announce_count: 3
+  announce_interval_ms: 250
+  announce_period_s: 60
+  reverse_ptr: true
+  interface_mode: auto
+  interfaces: []
+
+  records:
+    - name: nas.local
+      type: A
+      value: 192.168.5.10
+    - name: nas.local
+      type: AAAA
+      value: fe80::1
+    - name: box.local
+      type: TXT
+      value: env=lab
+
+  services:
+    - instance: Web Server
+      type: _http._tcp.local
+      host: nas.local
+      port: 8080
+      txt:
+        path: /
+        version: "1"

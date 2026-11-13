@@ -4,10 +4,12 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Lan Studio mDNS component (M1 skeleton, protocol not implemented yet)"
+description = "Lan Studio mDNS component (M2.1 protocol engine)"
 
 [dependencies]
 common-config = { workspace = true }
+common-dns = { workspace = true }
+common-net = { workspace = true }
 common-log = { workspace = true }
 common-health = { workspace = true }
 common-auth = { workspace = true }

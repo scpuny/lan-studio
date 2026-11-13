@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "common/config",
+    "common/dns",
+    "common/net",
     "common/log",
     "common/health",
     "common/auth",
@@ -19,6 +21,8 @@ rust-version = "1.75"
 
 [workspace.dependencies]
 common-config = { path = "common/config" }
+common-dns = { path = "common/dns" }
+common-net = { path = "common/net" }
 common-log = { path = "common/log" }
 common-health = { path = "common/health" }
 common-auth = { path = "common/auth" }

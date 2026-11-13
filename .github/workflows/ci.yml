@@ -40,24 +40,15 @@ jobs:
       - name: Build release artifact
         run: cargo build --release -p lan-mdns
 
-      - name: Smoke test artifact
+      - name: Smoke test artifact (M2.1 runtime, isolated multicast)
+        env:
+          LAN_STUDIO_CONFIG: components/lan-mdns/config.template.yaml
+          LAN_STUDIO_PORT: "18080"
+          LAN_MDNS_PORT: "15353"
+          LAN_MDNS_GROUP: "239.1.2.3"
         run: |
           set -e
-          export LAN_STUDIO_PORT=18080
-          export LAN_STUDIO_CONFIG=components/lan-mdns/config.template.yaml
-          ./target/release/lan-mdns &
-          PID=$!
-          trap 'kill $PID 2>/dev/null || true' EXIT
-          for i in $(seq 1 30); do
-            if curl -fsS --noproxy '*' http://127.0.0.1:18080/healthz >/dev/null 2>&1; then break; fi
-            sleep 0.3
-          done
-          curl -fsS --noproxy '*' http://127.0.0.1:18080/healthz | grep -q '"ok":true'
-          curl -fsS --noproxy '*' http://127.0.0.1:18080/readyz | grep -q '"ok":true'
-          curl -fsS --noproxy '*' http://127.0.0.1:18080/readyz | grep -q '"ready":true'
-          curl -fsS --noproxy '*' http://127.0.0.1:18080/api/metrics | grep -q 'lanstudio_mdns_build_info'
-          curl -fsS --noproxy '*' http://127.0.0.1:18080/api/metrics | grep -q '# TYPE lanstudio_mdns_up gauge'
-          curl -fsS --noproxy '*' http://127.0.0.1:18080/ | grep -q 'Lan Studio'
+          python3 scripts/smoke_mdns.py
           ./target/release/lan-mdns --cli | grep -q 'component=lan-mdns'
           echo 'SMOKE OK'
 
