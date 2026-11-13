@@ -137,34 +137,27 @@
               <a-button size="mini" @click="addRecord">新增记录</a-button>
             </div>
             <div v-if="model.mdns.records.length === 0" class="ls-note">尚未发布任何记录。</div>
-            <div
-              v-for="(record, index) in model.mdns.records"
-              :key="`r${index}`"
-              class="ls-row"
-              style="margin-bottom: 8px"
-            >
-              <a-input v-model="record.name" placeholder="nas.local" style="width: 220px" />
-              <a-select v-model="record.type" style="width: 110px">
-                <a-option v-for="type in RECORD_TYPES" :key="type" :value="type">
-                  {{ type }}
-                </a-option>
-              </a-select>
-              <a-input v-model="record.value" placeholder="192.168.5.10" style="width: 260px" />
-              <a-input-number
-                v-model="record.ttl"
-                :min="0"
-                :max="86400"
-                placeholder="TTL"
-                style="width: 110px"
-              />
-              <a-button
-                size="mini"
-                status="danger"
-                type="text"
-                @click="model.mdns.records.splice(index, 1)"
-              >
-                删除
-              </a-button>
+            <div v-else class="ls-list ls-list--records">
+              <div class="ls-list-head">
+                <span>名称</span>
+                <span>类型</span>
+                <span>值</span>
+                <span>TTL</span>
+                <span></span>
+              </div>
+              <div v-for="(record, index) in model.mdns.records" :key="`r${index}`" class="ls-list-row">
+                <a-input v-model="record.name" placeholder="nas.local" />
+                <a-select v-model="record.type">
+                  <a-option v-for="type in RECORD_TYPES" :key="type" :value="type">
+                    {{ type }}
+                  </a-option>
+                </a-select>
+                <a-input v-model="record.value" placeholder="192.168.5.10" />
+                <a-input-number v-model="record.ttl" :min="0" :max="86400" placeholder="TTL" />
+                <a-button size="mini" status="danger" type="text" @click="model.mdns.records.splice(index, 1)">
+                  删除
+                </a-button>
+              </div>
             </div>
 
             <div class="ls-panel-title" style="margin-top: 22px">
@@ -177,10 +170,15 @@
             <div
               v-for="(service, index) in model.mdns.services"
               :key="`s${index}`"
-              class="ls-panel"
-              style="margin-bottom: 10px"
+              class="ls-group"
             >
-              <div class="ls-field-grid">
+              <div class="ls-group-head">
+                <span class="ls-group-title">
+                  {{ service.instance || '未命名实例' }}
+                </span>
+                <span class="ls-note">{{ service.type || '_http._tcp.local' }}</span>
+              </div>
+              <div class="ls-field-grid ls-grid--services">
                 <div class="ls-field">
                   <label>实例名</label>
                   <a-input v-model="service.instance" placeholder="Web Server" />
@@ -207,7 +205,7 @@
                   @input="onTxtInput(service, $event)"
                 ></textarea>
               </div>
-              <div class="ls-row">
+              <div class="ls-row" style="margin-top: 4px">
                 <span class="ls-inline">
                   <a-switch v-model="service.proxy" />
                   <span class="ls-note">参与内置网关代理（需全局网关开启）</span>
@@ -231,29 +229,21 @@
               <a-button size="mini" @click="addTarget">新增目标</a-button>
             </div>
             <div v-if="model.mdns.healthTargets.length === 0" class="ls-note">未配置健康目标。</div>
-            <div
-              v-for="(target, index) in model.mdns.healthTargets"
-              :key="`t${index}`"
-              class="ls-row"
-              style="margin-bottom: 8px"
-            >
-              <a-input v-model="target.alias" placeholder="别名（可空）" style="width: 180px" />
-              <a-input v-model="target.host" placeholder="192.168.5.10" style="width: 220px" />
-              <a-input-number
-                v-model="target.port"
-                :min="1"
-                :max="65535"
-                placeholder="端口"
-                style="width: 110px"
-              />
-              <a-button
-                size="mini"
-                status="danger"
-                type="text"
-                @click="model.mdns.healthTargets.splice(index, 1)"
-              >
-                删除
-              </a-button>
+            <div v-else class="ls-list ls-list--health">
+              <div class="ls-list-head">
+                <span>别名</span>
+                <span>主机</span>
+                <span>端口</span>
+                <span></span>
+              </div>
+              <div v-for="(target, index) in model.mdns.healthTargets" :key="`t${index}`" class="ls-list-row">
+                <a-input v-model="target.alias" placeholder="别名（可空）" />
+                <a-input v-model="target.host" placeholder="192.168.5.10" />
+                <a-input-number v-model="target.port" :min="1" :max="65535" placeholder="端口" />
+                <a-button size="mini" status="danger" type="text" @click="model.mdns.healthTargets.splice(index, 1)">
+                  删除
+                </a-button>
+              </div>
             </div>
           </a-tab-pane>
 
@@ -303,26 +293,23 @@
               <a-button size="mini" @click="addGatewayHost">新增路由</a-button>
             </div>
             <div v-if="model.mdns.gateway.hosts.length === 0" class="ls-note">无显式路由覆盖。</div>
-            <div
-              v-for="(host, index) in model.mdns.gateway.hosts"
-              :key="`g${index}`"
-              class="ls-row"
-              style="margin-bottom: 8px"
-            >
-              <a-input v-model="host.host" placeholder="printer.local" style="width: 200px" />
-              <a-input v-model="host.target" placeholder="192.168.5.30:80" style="width: 220px" />
-              <span class="ls-inline">
-                <a-switch v-model="host.proxy" />
-                <span class="ls-note">代理</span>
-              </span>
-              <a-button
-                size="mini"
-                status="danger"
-                type="text"
-                @click="model.mdns.gateway.hosts.splice(index, 1)"
-              >
-                删除
-              </a-button>
+            <div v-else class="ls-list ls-list--routes">
+              <div class="ls-list-head">
+                <span>Host</span>
+                <span>目标</span>
+                <span>代理</span>
+                <span></span>
+              </div>
+              <div v-for="(host, index) in model.mdns.gateway.hosts" :key="`g${index}`" class="ls-list-row">
+                <a-input v-model="host.host" placeholder="printer.local" />
+                <a-input v-model="host.target" placeholder="192.168.5.30:80" />
+                <div class="ls-list-cell--switch">
+                  <a-switch v-model="host.proxy" />
+                </div>
+                <a-button size="mini" status="danger" type="text" @click="model.mdns.gateway.hosts.splice(index, 1)">
+                  删除
+                </a-button>
+              </div>
             </div>
           </a-tab-pane>
 
@@ -356,25 +343,13 @@
             <div v-if="model.mdns.interfaces.length === 0" class="ls-note">
               列表为空：<code>all</code> 会自动展开为全部本机地址，<code>auto</code> 由内核选择。
             </div>
-            <div
-              v-for="(_addr, index) in model.mdns.interfaces"
-              :key="`i${index}`"
-              class="ls-row"
-              style="margin-bottom: 8px"
-            >
-              <a-input
-                v-model="model.mdns.interfaces[index]"
-                placeholder="192.168.5.20"
-                style="width: 240px"
-              />
-              <a-button
-                size="mini"
-                status="danger"
-                type="text"
-                @click="model.mdns.interfaces.splice(index, 1)"
-              >
-                删除
-              </a-button>
+            <div v-else class="ls-list ls-list--single">
+              <div v-for="(_addr, index) in model.mdns.interfaces" :key="`i${index}`" class="ls-list-row">
+                <a-input v-model="model.mdns.interfaces[index]" placeholder="192.168.5.20" />
+                <a-button size="mini" status="danger" type="text" @click="model.mdns.interfaces.splice(index, 1)">
+                  删除
+                </a-button>
+              </div>
             </div>
 
             <div class="ls-panel-title" style="margin-top: 18px">

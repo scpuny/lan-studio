@@ -608,6 +608,10 @@ body {
   align-items: center;
   flex-wrap: wrap;
 }
+.ls-list-cell--switch {
+  display: flex;
+  align-items: center;
+}
 .ls-field {
   display: flex;
   flex-direction: column;
@@ -835,8 +839,15 @@ body {
 .ls-app .arco-switch {
   zoom: 1.28;
 }
+/* .ls-field 是纵向 flex（align-items: stretch）会把开关拉满整列宽度，
+   必须收回到自然宽度，否则开关会宽到占满一列 */
+.ls-app .ls-field .arco-switch,
+.ls-app .ls-inline .arco-switch {
+  align-self: flex-start;
+}
 
 /* 配置页子标签（card-gutter）放大，与整体节奏一致 */
+.ls-app .arco-tabs-type-card-gutter .arco-tabs-tab,
 .ls-app .arco-tabs-card .arco-tabs-tab {
   font-size: 14.5px;
   padding: 8px 18px;
@@ -845,4 +856,105 @@ body {
 /* 表格行高放宽，配合放大后的输入框 */
 .ls-app .arco-table-tr {
   min-height: 50px;
+}
+
+/* ============================================================
+   配置页 · 对齐列表：表头与数据行共享同一网格模板，纵向对齐
+   取代原来「写死 px 宽度的散排输入框」，消除杂乱
+   ============================================================ */
+.ls-list {
+  margin-top: 12px;
+}
+.ls-list-head,
+.ls-list-row {
+  display: grid;
+  gap: var(--ls-gap);
+  align-items: center;
+}
+.ls-list-head {
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--ls-line);
+  margin-bottom: 10px;
+}
+.ls-list-head > span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ls-ink-3);
+}
+.ls-list-row {
+  padding: 4px 0;
+}
+.ls-list-row > * {
+  min-width: 0;
+}
+.ls-list-row .arco-btn {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+/* 各列表的列宽模板（head 与 row 一致 → 对齐） */
+.ls-list--records .ls-list-head,
+.ls-list--records .ls-list-row {
+  grid-template-columns: minmax(180px, 1.2fr) 110px minmax(180px, 1.4fr) 110px 72px;
+}
+.ls-list--health .ls-list-head,
+.ls-list--health .ls-list-row {
+  grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.4fr) 110px 72px;
+}
+.ls-list--routes .ls-list-head,
+.ls-list--routes .ls-list-row {
+  grid-template-columns: minmax(160px, 1.2fr) minmax(180px, 1.4fr) 90px 72px;
+}
+.ls-list--single .ls-list-row {
+  grid-template-columns: minmax(0, 1fr) 72px;
+}
+@media (max-width: 900px) {
+  .ls-list-head {
+    display: none;
+  }
+  .ls-list--records .ls-list-row,
+  .ls-list--health .ls-list-row,
+  .ls-list--routes .ls-list-row,
+  .ls-list--single .ls-list-row {
+    grid-template-columns: 1fr 1fr 72px;
+    row-gap: 8px;
+  }
+}
+
+/* 服务实例分组卡片：浅底容器替代 panel 套 panel，层次干净 */
+.ls-group {
+  background: var(--ls-bg-soft);
+  border: 1px solid var(--ls-line-soft);
+  border-radius: var(--ls-radius-sm);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+.ls-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ls-group-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ls-ink);
+}
+.ls-group .ls-field-grid {
+  margin-bottom: 4px;
+}
+.ls-group .ls-field:last-child {
+  margin-bottom: 12px;
+}
+
+/* 服务实例 4 列在窄屏折叠为 2 列 */
+.ls-grid--services {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .ls-grid--services {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
