@@ -795,3 +795,54 @@ body {
     font-size: 28px;
   }
 }
+
+/* ============================================================
+   大气化覆盖：把 Arco 控件整体放大一档
+   Arco 的 large 档对 switch/btn/字号只是微调（input 仅 +4px），
+   肉眼难辨，故在这里用确定性 CSS 直接覆盖关键盒子，深浅主题通用。
+   作用域 .ls-app，不影响全局；表格行内 mini 按钮保持紧凑不动。
+   ============================================================ */
+.ls-app {
+  font-size: 15px;
+}
+
+/* 输入 / 数字 / 下拉：统一 42px，比 Arco large(34/36) 更舒展 */
+.ls-app .arco-input,
+.ls-app .arco-input-wrapper,
+.ls-app .arco-select-view {
+  height: 42px;
+  font-size: 15px;
+}
+.ls-app .arco-input {
+  padding: 8px 14px;
+}
+.ls-app .arco-select-view {
+  padding: 0 14px;
+}
+.ls-app .arco-textarea {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* 主/次按钮放大到 40px（排除 mini，表格行内密集操作仍紧凑） */
+.ls-app .arco-btn:not(.arco-btn-size-mini) {
+  min-height: 40px;
+  font-size: 15px;
+  padding: 0 18px;
+}
+
+/* 开关：等比放大，避免滑块绝对定位错位 */
+.ls-app .arco-switch {
+  zoom: 1.28;
+}
+
+/* 配置页子标签（card-gutter）放大，与整体节奏一致 */
+.ls-app .arco-tabs-card .arco-tabs-tab {
+  font-size: 14.5px;
+  padding: 8px 18px;
+}
+
+/* 表格行高放宽，配合放大后的输入框 */
+.ls-app .arco-table-tr {
+  min-height: 50px;
+}

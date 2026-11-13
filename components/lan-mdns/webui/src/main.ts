@@ -3,6 +3,7 @@ import type { Plugin } from 'vue'
 import {
   Alert,
   Button,
+  ConfigProvider,
   Empty,
   Input,
   InputNumber,
@@ -29,6 +30,7 @@ import App from './App.vue'
 const components = [
   Alert,
   Button,
+  ConfigProvider,
   Empty,
   Input,
   InputNumber,
