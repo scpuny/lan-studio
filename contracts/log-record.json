@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lan-studio.local/contracts/log-record.json",
+  "title": "Lan Studio structured log record",
+  "description": "One JSON object per line on disk, and the same shape on the SSE stream. Contract authority: PRD 3.5.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ts", "level", "source", "msg"],
+  "properties": {
+    "ts": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Unix seconds, UTC, float allowed"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["debug", "info", "warning", "error"]
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^lan-[a-z0-9-]+$"
+    },
+    "msg": {
+      "type": "string",
+      "description": "Human readable message, never contains serialized JSON"
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "request_id": { "type": "string" }
+  }
+}

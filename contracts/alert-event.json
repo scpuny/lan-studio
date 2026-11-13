@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lan-studio.local/contracts/alert-event.json",
+  "title": "Lan Studio alert event",
+  "description": "Canonical event emitted by every component. Platform adapters (dingtalk / feishu / slack / wecom / generic) are implemented once in common-alert. Contract authority: PRD 3.4.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "level", "kind", "title", "detail", "time"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "pattern": "^lan-[a-z0-9-]+$",
+      "description": "Component id, must equal config.component"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["info", "warning", "critical"]
+    },
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Registered in docs/ALERT-SCHEMA.md"
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "detail": { "type": "string", "maxLength": 2000 },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "RFC 3339 UTC, must end with Z"
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Structured context, no nested large text"
+    },
+    "request_id": { "type": "string" }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "ts": 1763005560.123,
+  "level": "info",
+  "source": "lan-mdns",
+  "msg": "配置已热重载",
+  "extra": {
+    "records": 18,
+    "reload_source": "mtime"
+  },
+  "request_id": "01J9Z8K4M2"
+}

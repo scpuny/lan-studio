@@ -1,0 +1,13 @@
+{
+  "source": "lan-mdns",
+  "level": "warning",
+  "kind": "name_conflict",
+  "title": "mDNS 名称冲突",
+  "detail": "nas.local 出现同名异值应答",
+  "time": "2026-11-13T09:46:00Z",
+  "extra": {
+    "name": "nas.local",
+    "source_ip": "192.168.5.20"
+  },
+  "request_id": "01J9Z8K4M2"
+}

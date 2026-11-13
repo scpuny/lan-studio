@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lan-studio.local/contracts/snapshot.json",
+  "title": "Lan Studio config snapshot",
+  "description": "Self-contained config version record. Contains config text only, never credentials. Contract authority: PRD 3.6.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "component", "created_at", "reason", "config_text", "checksum"],
+  "properties": {
+    "schema": { "type": "integer", "const": 1 },
+    "component": {
+      "type": "string",
+      "pattern": "^lan-[a-z0-9-]+$"
+    },
+    "created_at": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "reason": {
+      "type": "string",
+      "description": "e.g. before-save, before-rollback, manual"
+    },
+    "config_text": { "type": "string" },
+    "checksum": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lan-studio.local/contracts/config.schema.json",
+  "title": "Lan Studio unified configuration",
+  "description": "Common configuration segments shared by every lan-* component. Component-specific segments live under their own namespace and are permitted by additionalProperties. Contract authority: PRD 3.1.",
+  "type": "object",
+  "required": ["version", "component", "server"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version, used for migration"
+    },
+    "component": {
+      "type": "string",
+      "pattern": "^lan-[a-z0-9-]+$",
+      "description": "Must equal the binary name"
+    },
+    "server": {
+      "type": "object",
+      "required": ["webui"],
+      "additionalProperties": true,
+      "properties": {
+        "listen": { "type": "string", "default": "0.0.0.0" },
+        "webui": { "type": "boolean", "default": true },
+        "admin_token": { "type": "string", "default": "" },
+        "log_level": {
+          "type": "string",
+          "enum": ["debug", "info", "warning", "error"],
+          "default": "info"
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "metrics": { "type": "boolean", "default": true },
+        "alerts": { "type": "boolean", "default": true },
+        "history_limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 30 }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "max_bytes": { "type": "integer", "minimum": 1024, "default": 1048576 },
+        "backup_count": { "type": "integer", "minimum": 0, "maximum": 100, "default": 3 },
+        "level": {
+          "type": "string",
+          "enum": ["debug", "info", "warning", "error"],
+          "default": "info"
+        }
+      }
+    },
+    "alerts": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "webhooks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "cooldown_seconds": { "type": "integer", "minimum": 0, "default": 300 },
+        "timeout_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 5.0 },
+        "max_retries": { "type": "integer", "minimum": 0, "maximum": 2, "default": 2 }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+target/
+dist/
+node_modules/
+*.log
+*.tmp
+*.bak
+.DS_Store
+__pycache__/
+*.pyc

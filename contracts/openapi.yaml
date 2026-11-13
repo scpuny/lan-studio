@@ -1,0 +1,522 @@
+openapi: 3.0.3
+info:
+  title: Lan Studio Unified Component API
+  version: 1.0.0
+  description: >-
+    All lan-* components expose this identical API surface. Component-specific
+    endpoints are listed under the "component" tag. Contract authority: PRD 3.2.
+  license:
+    name: MIT
+servers:
+  - url: http://{host}:{port}
+    description: Component embedded web service
+    variables:
+      host:
+        default: 127.0.0.1
+      port:
+        default: "8080"
+security:
+  - AdminToken: []
+tags:
+  - name: common
+    description: Endpoints mandatory for every component
+  - name: config
+    description: Configuration, snapshots and history
+  - name: observability
+    description: Logs, metrics and alerts
+  - name: auth
+    description: Authentication state and password management
+  - name: component
+    description: lan-mdns specific endpoints
+
+paths:
+  /healthz:
+    get:
+      tags: [common]
+      summary: Liveness probe, always ok
+      security: []
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+  /readyz:
+    get:
+      tags: [common]
+      summary: Readiness probe
+      security: []
+      responses:
+        "200":
+          description: Config loaded and main loop running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /api/status:
+    get:
+      tags: [common]
+      summary: Runtime status and counters
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/config:
+    get:
+      tags: [config]
+      summary: Current config, structured plus raw text
+      responses:
+        "200":
+          description: Config document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+    post:
+      tags: [config]
+      summary: Save config (validate, snapshot, atomic replace, hot reload)
+      security:
+        - AdminToken: []
+        - AdminPassword: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigSaveRequest"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/AuthFailed"
+        "409":
+          $ref: "#/components/responses/SetupRequired"
+  /api/config/snapshot:
+    get:
+      tags: [config]
+      summary: Export a self-contained config snapshot
+      responses:
+        "200":
+          description: Snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snapshot"
+    post:
+      tags: [config]
+      summary: Import a config snapshot (validate before write)
+      security:
+        - AdminToken: []
+        - AdminPassword: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Snapshot"
+      responses:
+        "200":
+          description: Imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/AuthFailed"
+  /api/config/history:
+    get:
+      tags: [config]
+      summary: List bounded config snapshots, newest first
+      responses:
+        "200":
+          description: History entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/config/rollback:
+    post:
+      tags: [config]
+      summary: Rollback to a snapshot id
+      security:
+        - AdminToken: []
+        - AdminPassword: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                  pattern: "^config-[0-9TZa-f-]+\\.json$"
+      responses:
+        "200":
+          description: Rolled back
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/AuthFailed"
+  /api/reload:
+    post:
+      tags: [config]
+      summary: Trigger config reload manually
+      security:
+        - AdminToken: []
+      responses:
+        "200":
+          description: Reload requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/logs:
+    get:
+      tags: [observability]
+      summary: Recent structured log records
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 200
+      responses:
+        "200":
+          description: Log records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/logs/stream:
+    get:
+      tags: [observability]
+      summary: SSE stream of structured log records
+      responses:
+        "200":
+          description: Event stream, same schema as /api/logs
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /api/metrics:
+    get:
+      tags: [observability]
+      summary: Prometheus text exposition 0.0.4
+      responses:
+        "200":
+          description: Metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/alerts:
+    get:
+      tags: [observability]
+      summary: Alert dispatcher state and counters
+      responses:
+        "200":
+          description: Alert status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/auth:
+    get:
+      tags: [auth]
+      summary: Authentication state
+      responses:
+        "200":
+          description: Auth state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/auth/password:
+    post:
+      tags: [auth]
+      summary: Set or change the admin password
+      security:
+        - AdminToken: []
+        - AdminPassword: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_password]
+              properties:
+                new_password:
+                  type: string
+                  minLength: 8
+                  maxLength: 256
+                current_password:
+                  type: string
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+        "403":
+          $ref: "#/components/responses/AuthFailed"
+  /api/auth/verify:
+    post:
+      tags: [auth]
+      summary: Verify the admin password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+        "403":
+          $ref: "#/components/responses/AuthFailed"
+  /api/records:
+    get:
+      tags: [component]
+      summary: lan-mdns records that will be published
+      responses:
+        "200":
+          description: Records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/probe:
+    post:
+      tags: [component]
+      summary: lan-mdns active probe for a name and type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                  default: PTR
+                unicast:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Parsed answers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/interfaces:
+    get:
+      tags: [component]
+      summary: lan-mdns available network interfaces
+      responses:
+        "200":
+          description: Interfaces
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/health/targets:
+    get:
+      tags: [component]
+      summary: lan-mdns business health targets (NOT the liveness probe)
+      responses:
+        "200":
+          description: Health targets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/queries:
+    get:
+      tags: [component]
+      summary: lan-mdns bounded query audit log
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 200
+      responses:
+        "200":
+          description: Query audit entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/browse:
+    get:
+      tags: [component]
+      summary: lan-mdns LAN service map
+      responses:
+        "200":
+          description: Browse instances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/conflicts:
+    get:
+      tags: [component]
+      summary: lan-mdns name conflict registry
+      responses:
+        "200":
+          description: Conflicts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+components:
+  securitySchemes:
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+    AdminPassword:
+      type: apiKey
+      in: header
+      name: X-Admin-Password
+  responses:
+    BadRequest:
+      description: Invalid input or config
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    AuthFailed:
+      description: Missing or wrong credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    SetupRequired:
+      description: Admin password not initialized yet
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    ErrorCode:
+      type: string
+      enum:
+        - invalid_config
+        - auth_required
+        - auth_failed
+        - setup_required
+        - not_found
+        - target_unreachable
+        - rate_limited
+        - internal_error
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+    ApiOk:
+      type: object
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          additionalProperties: true
+        request_id:
+          type: string
+    ApiError:
+      type: object
+      required: [ok, error, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: "#/components/schemas/ErrorBody"
+        request_id:
+          type: string
+    ConfigSaveRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          description: Raw YAML config text
+        mode:
+          type: string
+          enum: [form, raw]
+          default: raw
+    Snapshot:
+      type: object
+      required: [schema, component, created_at, reason, config_text, checksum]
+      properties:
+        schema:
+          type: integer
+          const: 1
+        component:
+          type: string
+          pattern: "^lan-[a-z0-9-]+$"
+        created_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        config_text:
+          type: string
+        checksum:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
