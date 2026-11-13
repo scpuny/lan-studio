@@ -53,6 +53,8 @@ pub struct ObservedEntry {
     pub name: String,
     pub rtype: u16,
     pub value: String,
+    /// Record TTL as announced by the peer; used for F-B05 / F-D02 aging.
+    pub ttl: u32,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -62,6 +64,8 @@ pub struct StatsSnapshot {
     pub ingested: u64,
     pub announces: u64,
     pub malformed: u64,
+    pub bytes_in: u64,
+    pub bytes_out: u64,
 }
 
 #[derive(Default)]
@@ -71,6 +75,8 @@ struct Stats {
     ingested: AtomicU64,
     announces: AtomicU64,
     malformed: AtomicU64,
+    bytes_in: AtomicU64,
+    bytes_out: AtomicU64,
 }
 
 fn push_bounded<T>(queue: &Mutex<VecDeque<T>>, item: T, cap: usize) {
@@ -89,7 +95,7 @@ pub struct Engine {
     observed: Arc<Mutex<VecDeque<ObservedEntry>>>,
     running: Arc<AtomicBool>,
     threads: Mutex<Vec<JoinHandle<()>>>,
-    config: MdnsConfig,
+    config: RwLock<MdnsConfig>,
     own_ips: Vec<IpAddr>,
 }
 
@@ -112,7 +118,7 @@ impl Engine {
             observed: Arc::new(Mutex::new(VecDeque::with_capacity(MAX_OBSERVED))),
             running: Arc::new(AtomicBool::new(true)),
             threads: Mutex::new(Vec::new()),
-            config,
+            config: RwLock::new(config),
             own_ips,
         });
         {
@@ -139,6 +145,9 @@ impl Engine {
     }
 
     fn handle(&self, data: &[u8], peer: SocketAddr) {
+        self.stats
+            .bytes_in
+            .fetch_add(data.len() as u64, Ordering::Relaxed);
         let message = match Message::decode(data) {
             Ok(message) => message,
             Err(_) => {
@@ -188,8 +197,12 @@ impl Engine {
         } else {
             self.socket.group_addr()
         };
-        if self.socket.send(&response.encode(), target).is_ok() {
+        let encoded = response.encode();
+        if self.socket.send(&encoded, target).is_ok() {
             self.stats.responses.fetch_add(1, Ordering::Relaxed);
+            self.stats
+                .bytes_out
+                .fetch_add(encoded.len() as u64, Ordering::Relaxed);
         }
     }
 
@@ -214,6 +227,7 @@ impl Engine {
                     name: rr.name.clone(),
                     rtype: rr.rtype,
                     value: rdata_text(rr),
+                    ttl: rr.ttl,
                 },
                 MAX_OBSERVED,
             );
@@ -221,22 +235,27 @@ impl Engine {
     }
 
     fn announce_loop(&self) {
-        for _ in 0..self.config.announce_count {
+        let (count, interval_ms) = {
+            let cfg = self.config.read().unwrap();
+            (cfg.announce_count, cfg.announce_interval_ms)
+        };
+        for _ in 0..count {
             if !self.running.load(Ordering::Relaxed) {
                 return;
             }
             self.announce();
-            thread::sleep(Duration::from_millis(self.config.announce_interval_ms));
-        }
-        if self.config.announce_period_s == 0 {
-            return;
+            thread::sleep(Duration::from_millis(interval_ms));
         }
         let tick_ms = 250u64;
         let mut elapsed_ms = 0u64;
         while self.running.load(Ordering::Relaxed) {
             thread::sleep(Duration::from_millis(tick_ms));
             elapsed_ms += tick_ms;
-            if elapsed_ms >= self.config.announce_period_s.saturating_mul(1000) {
+            let period_s = self.config.read().unwrap().announce_period_s;
+            if period_s == 0 {
+                return;
+            }
+            if elapsed_ms >= period_s.saturating_mul(1000) {
                 elapsed_ms = 0;
                 self.announce();
             }
@@ -249,8 +268,12 @@ impl Engine {
         if response.answers.is_empty() {
             return;
         }
-        if self.socket.broadcast(&response.encode()).is_ok() {
+        let encoded = response.encode();
+        if self.socket.broadcast(&encoded).is_ok() {
             self.stats.announces.fetch_add(1, Ordering::Relaxed);
+            self.stats
+                .bytes_out
+                .fetch_add(encoded.len() as u64, Ordering::Relaxed);
         }
     }
 
@@ -265,7 +288,12 @@ impl Engine {
             .map(|rr| rr.goodbye())
             .collect();
         if !response.answers.is_empty() {
-            let _ = self.socket.broadcast(&response.encode());
+            let encoded = response.encode();
+            if self.socket.broadcast(&encoded).is_ok() {
+                self.stats
+                    .bytes_out
+                    .fetch_add(encoded.len() as u64, Ordering::Relaxed);
+            }
         }
     }
 
@@ -288,25 +316,34 @@ impl Engine {
         // port. The unicast reply then has only one possible recipient (this
         // socket); with SO_REUSEPORT on the shared port the kernel could
         // otherwise deliver it to the engine socket instead.
-        let bind_port = if unicast { 0 } else { self.config.port };
-        let socket = MdnsSocket::bind(self.config.group, bind_port, &self.config.interfaces, true)?;
+        let (group, mdns_port, interfaces) = {
+            let cfg = self.config.read().unwrap();
+            (cfg.group, cfg.port, cfg.interfaces.clone())
+        };
+        let bind_port = if unicast { 0 } else { mdns_port };
+        let socket = MdnsSocket::bind(group, bind_port, &interfaces, true)?;
         let mut question = Question::new(name, qtype);
         if unicast {
             question = question.with_qu();
         }
         let query = Message::query(0, vec![question.clone()]);
         let target = if unicast {
-            group_addr(self.config.group, self.config.port)
+            group_addr(group, mdns_port)
         } else {
             socket.group_addr()
         };
-        socket.send(&query.encode(), target)?;
+        let encoded = query.encode();
+        socket.send(&encoded, target)?;
+        self.stats
+            .bytes_out
+            .fetch_add(encoded.len() as u64, Ordering::Relaxed);
         let deadline = Instant::now() + Duration::from_millis(timeout_ms);
         let mut buffer = [0u8; MAX_BUFFER];
         let mut found = Vec::new();
         while Instant::now() < deadline {
             match socket.recv(&mut buffer) {
                 Ok((len, _)) => {
+                    self.stats.bytes_in.fetch_add(len as u64, Ordering::Relaxed);
                     if let Ok(message) = Message::decode(&buffer[..len]) {
                         if message.is_response() {
                             for rr in message
@@ -349,11 +386,51 @@ impl Engine {
             ingested: self.stats.ingested.load(Ordering::Relaxed),
             announces: self.stats.announces.load(Ordering::Relaxed),
             malformed: self.stats.malformed.load(Ordering::Relaxed),
+            bytes_in: self.stats.bytes_in.load(Ordering::Relaxed),
+            bytes_out: self.stats.bytes_out.load(Ordering::Relaxed),
         }
     }
 
-    pub fn config(&self) -> &MdnsConfig {
-        &self.config
+    pub fn config(&self) -> MdnsConfig {
+        self.config.read().unwrap().clone()
+    }
+
+    /// F-E03: swap the declarative config and the published RR set.
+    /// Socket-level parameters (group / port / interfaces) belong to the
+    /// already-bound UDP socket and therefore still require a restart; every
+    /// other field applies on the next announce, probe or status read.
+    pub fn reload(&self, config: MdnsConfig) {
+        let records = config.build_records();
+        *self.config.write().unwrap() = config;
+        *self.records.write().unwrap() = records;
+    }
+
+    /// F-C06 / F-D01 / F-B05: aging of the bounded audit and observed rings.
+    /// Query entries use `default_ttl_s`; observed entries honor their own RR
+    /// TTL (falling back to the default when the peer advertised TTL 0).
+    pub fn purge_expired(&self, now: f64, default_ttl_s: f64) {
+        {
+            let mut queue = self.queries.lock().unwrap();
+            while queue
+                .front()
+                .is_some_and(|entry| now - entry.ts > default_ttl_s)
+            {
+                queue.pop_front();
+            }
+        }
+        {
+            let mut queue = self.observed.lock().unwrap();
+            while queue.front().is_some_and(|entry| {
+                let ttl = if entry.ttl == 0 {
+                    default_ttl_s
+                } else {
+                    entry.ttl as f64
+                };
+                now - entry.ts > ttl
+            }) {
+                queue.pop_front();
+            }
+        }
     }
 }
 

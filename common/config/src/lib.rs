@@ -15,6 +15,7 @@ pub struct Config {
     pub version: i64,
     pub component: String,
     pub listen: String,
+    pub port: u16,
     pub webui: bool,
     pub admin_token: String,
     pub log_level: String,
@@ -27,6 +28,7 @@ impl Default for Config {
             version: 1,
             component: "lan-mdns".to_string(),
             listen: "127.0.0.1".to_string(),
+            port: 8080,
             webui: true,
             admin_token: String::new(),
             log_level: "info".to_string(),
@@ -232,6 +234,12 @@ pub fn validate_common(flat: &HashMap<String, String>) -> Result<(), ConfigError
     if !["debug", "info", "warning", "error"].contains(&log_level.as_str()) {
         return Err(bad("logging.level", "invalid log level"));
     }
+    if let Some(raw) = flat.get("server.port") {
+        let port = raw.parse::<u32>().unwrap_or(0);
+        if !(1..=65535).contains(&port) {
+            return Err(bad("server.port", "must be 1..65535"));
+        }
+    }
     let history = get_u32(flat, "observability.history_limit", 30);
     if !(1..=1000).contains(&history) {
         return Err(bad("observability.history_limit", "must be 1..1000"));
@@ -272,6 +280,11 @@ pub fn apply_flat(cfg: &mut Config, flat: &HashMap<String, String>) {
     if let Some(value) = flat.get("server.log_level") {
         cfg.log_level = value.clone();
     }
+    if let Some(value) = flat.get("server.port") {
+        if let Ok(port) = value.parse::<u16>() {
+            cfg.port = port;
+        }
+    }
 }
 
 pub fn load(path: &str) -> Config {
@@ -293,13 +306,14 @@ pub fn validate_text(text: &str) -> Result<HashMap<String, String>, ConfigError>
     Ok(flat)
 }
 
-/// M1 keeps the listening port out of the frozen config schema; it is
-/// supplied by the environment. M2 will fold it into config.schema.json.
-pub fn port_from_env() -> u16 {
+/// Resolve the listening port. `server.port` in config.schema.json is the
+/// authoritative value; `LAN_STUDIO_PORT` remains a test/CI isolation hook so
+/// smoke tests can bind a high port without editing the config file.
+pub fn port_from_env(configured: u16) -> u16 {
     std::env::var("LAN_STUDIO_PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(8080)
+        .unwrap_or(configured)
 }
 
 pub fn config_path_from_env() -> String {
@@ -384,6 +398,18 @@ mdns:
         assert_eq!(get_u16(&flat, "mdns.announce", 3), 7);
         assert!(!get_bool(&flat, "mdns.enabled", false));
         assert_eq!(get_str(&flat, "mdns.group", "224.0.0.251"), "224.0.0.251");
+    }
+
+    #[test]
+    fn server_port_is_part_of_the_frozen_schema() {
+        let text = "version: 1\ncomponent: lan-mdns\nserver:\n  port: 9100\n  webui: true\n";
+        let flat = validate_text(text).unwrap();
+        let mut cfg = Config::default();
+        apply_flat(&mut cfg, &flat);
+        assert_eq!(cfg.port, 9100);
+        let err =
+            validate_text("version: 1\ncomponent: lan-mdns\nserver:\n  port: 70000\n").unwrap_err();
+        assert_eq!(err.field, "server.port");
     }
 
     #[test]

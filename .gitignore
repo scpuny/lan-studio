@@ -7,3 +7,9 @@ node_modules/
 .DS_Store
 __pycache__/
 *.pyc
+
+# Runtime state — never commit admin credentials or config snapshots
+auth.toml
+auth.toml.tmp
+config_history/
+logs/

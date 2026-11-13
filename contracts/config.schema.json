@@ -22,7 +22,8 @@
       "required": ["webui"],
       "additionalProperties": true,
       "properties": {
-        "listen": { "type": "string", "default": "0.0.0.0" },
+        "listen": { "type": "string", "default": "127.0.0.1", "description": "Management interface binds loopback by default (F-F05)" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8080 },
         "webui": { "type": "boolean", "default": true },
         "admin_token": { "type": "string", "default": "" },
         "log_level": {

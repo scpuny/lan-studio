@@ -53,6 +53,15 @@ pub struct ServiceDef {
     pub txt: Vec<String>,
 }
 
+/// TCP business health target (F-D03). `alias` is optional and, when present,
+/// is the only value allowed as a per-target metric label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealthTargetDef {
+    pub alias: String,
+    pub host: String,
+    pub port: u16,
+}
+
 #[derive(Debug, Clone)]
 pub struct MdnsConfig {
     pub group: Ipv4Addr,
@@ -66,6 +75,7 @@ pub struct MdnsConfig {
     pub reverse_ptr: bool,
     pub records: Vec<RecordDef>,
     pub services: Vec<ServiceDef>,
+    pub health_targets: Vec<HealthTargetDef>,
 }
 
 impl MdnsConfig {
@@ -199,6 +209,36 @@ impl MdnsConfig {
             });
         }
 
+        let mut health_targets = Vec::new();
+        for index in 0..list_len(flat, "mdns.health_targets") {
+            let base = format!("mdns.health_targets[{}]", index);
+            let alias = get_str(flat, &format!("{}.alias", base), "");
+            let host = get_str(flat, &format!("{}.host", base), "");
+            let target_port = get_u16(flat, &format!("{}.port", base), 0);
+            if host.is_empty() {
+                return Err(error(&format!("{}.host", base), "must not be empty"));
+            }
+            if target_port == 0 {
+                return Err(error(&format!("{}.port", base), "must be 1..65535"));
+            }
+            let valid_alias = alias.is_empty()
+                || (alias.len() <= 64
+                    && alias
+                        .chars()
+                        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_'));
+            if !valid_alias {
+                return Err(error(&format!("{}.alias", base), "invalid alias"));
+            }
+            health_targets.push(HealthTargetDef {
+                alias,
+                host,
+                port: target_port,
+            });
+        }
+        if health_targets.len() > 64 {
+            return Err(error("mdns.health_targets", "at most 64 targets"));
+        }
+
         Ok(Self {
             group,
             port,
@@ -211,6 +251,7 @@ impl MdnsConfig {
             reverse_ptr,
             records,
             services,
+            health_targets,
         })
     }
 
@@ -337,6 +378,35 @@ mdns:
         assert!(rrs
             .iter()
             .any(|rr| rr.name == "_services._dns-sd._udp.local"));
+    }
+
+    #[test]
+    fn parses_health_targets_and_rejects_invalid_alias() {
+        let text = "\
+version: 1
+component: lan-mdns
+mdns:
+  health_targets:
+    - alias: self
+      host: 127.0.0.1
+      port: 8080
+    - alias: \"\"
+      host: 127.0.0.1
+      port: 1
+";
+        let cfg = MdnsConfig::from_flat(&parse_flat(text)).unwrap();
+        assert_eq!(cfg.health_targets.len(), 2);
+        assert_eq!(cfg.health_targets[0].alias, "self");
+        assert_eq!(cfg.health_targets[0].port, 8080);
+        assert!(cfg.health_targets[1].alias.is_empty());
+
+        let bad = parse_flat(
+            "version: 1\ncomponent: lan-mdns\nmdns:\n  health_targets:\n    - alias: bad/name\n      host: 127.0.0.1\n      port: 80\n",
+        );
+        assert_eq!(
+            MdnsConfig::from_flat(&bad).unwrap_err().field,
+            "mdns.health_targets[0].alias"
+        );
     }
 
     #[test]

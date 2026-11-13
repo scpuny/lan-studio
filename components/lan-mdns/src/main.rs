@@ -1,50 +1,62 @@
-//! lan-mdns M2.1 — real mDNS / DNS-SD responder.
+//! lan-mdns M2.2 — real mDNS / DNS-SD responder with the full observability,
+//! security and configuration-lifecycle API surface.
 //!
-//! Wires the shared API surface to the protocol engine: multicast receive loop,
-//! query answering (QU unicast + Known-Answer suppression), startup/periodic
-//! announcements, Goodbye on shutdown, inbound response ingestion, a bounded
-//! query audit log, an observed-service map and active probing.
-//!
-//! The mDNS protocol itself lives in `common-dns` / `common-net` / `engine.rs`;
-//! this file is only composition, HTTP routing and graceful lifecycle.
+//! M2.1 owns the protocol kernel (`common-dns` / `common-net` / `engine.rs`);
+//! this file is composition, HTTP routing, config lifecycle and graceful
+//! shutdown. See `docs/ADR/0003-m2-2-observability-security.md`.
 
 mod config;
 mod engine;
+mod state;
+mod store;
 
+use std::collections::HashMap;
 use std::fs;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
-use common_api::{err, json_quote, ok, App, Context, Request, Response};
-use common_config::{apply_flat, config_path_from_env, port_from_env, validate_text, Config};
+use common_api::{err, json_quote, ok, App, Context, Request, Response, SseSpec};
+use common_auth::{PasswordGuard, PasswordManager};
+use common_config::{
+    apply_flat, config_path_from_env, get_u32, get_u64, port_from_env, validate_text, Config,
+};
 use common_dns::{
     type_name, validate_name, TYPE_A, TYPE_AAAA, TYPE_ANY, TYPE_PTR, TYPE_SRV, TYPE_TXT,
 };
 use common_health::Health;
+use common_log::{EventSource, LogBuffer, RotatingFile};
 use common_metrics::Registry;
 use common_net::list_interfaces;
 use common_webui::INDEX_HTML;
 
 use config::MdnsConfig;
 use engine::Engine;
+use state::{HealthMonitor, State};
+use store::{ConfigStore, Snapshot};
 
 /// Compiled-in fallback so the single binary is usable without a config file.
 const DEFAULT_CONFIG: &str = include_str!("../config.template.yaml");
 const PROBE_TIMEOUT_MS: u64 = 800;
+const DEFAULT_AGING_TTL_S: f64 = 300.0;
+const HEALTH_INTERVAL_S: u64 = 15;
 
 static ENGINE: OnceLock<Arc<Engine>> = OnceLock::new();
+static STATE: OnceLock<Arc<State>> = OnceLock::new();
+static LOGS: OnceLock<Arc<LogBuffer>> = OnceLock::new();
 
 #[cfg(unix)]
 mod signals {
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    static FLAG: AtomicBool = AtomicBool::new(false);
+    static TERM: AtomicBool = AtomicBool::new(false);
+    static HUP: AtomicBool = AtomicBool::new(false);
 
-    extern "C" fn on_signal(_: i32) {
-        // Only lock-free atomics are async-signal-safe; the watchdog thread
-        // performs the actual shutdown and Goodbye broadcast.
-        FLAG.store(true, Ordering::Relaxed);
+    extern "C" fn on_term(_: i32) {
+        TERM.store(true, Ordering::Relaxed);
+    }
+    extern "C" fn on_hup(_: i32) {
+        HUP.store(true, Ordering::Relaxed);
     }
 
     extern "C" {
@@ -52,15 +64,19 @@ mod signals {
     }
 
     pub fn install() {
-        let handler: extern "C" fn(i32) = on_signal;
         unsafe {
-            signal(2, handler as usize); // SIGINT
-            signal(15, handler as usize); // SIGTERM
+            signal(2, on_term as *const () as usize); // SIGINT
+            signal(15, on_term as *const () as usize); // SIGTERM
+            signal(1, on_hup as *const () as usize); // SIGHUP -> config reload
         }
     }
 
     pub fn triggered() -> bool {
-        FLAG.load(Ordering::Relaxed)
+        TERM.load(Ordering::Relaxed)
+    }
+
+    pub fn take_hup() -> bool {
+        HUP.swap(false, Ordering::Relaxed)
     }
 }
 
@@ -70,12 +86,15 @@ mod signals {
     pub fn triggered() -> bool {
         false
     }
+    pub fn take_hup() -> bool {
+        false
+    }
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let path = config_path_from_env();
-    let (text, common, mut mdns) = match load_and_validate(&path) {
+    let (text, flat, common, mut mdns) = match load_and_validate(&path) {
         Ok(value) => value,
         Err(message) => {
             eprintln!("{}", common_log::error("lan-mdns", &message));
@@ -108,19 +127,100 @@ fn main() {
         return;
     }
 
+    // F-F05: never expose an unauthenticated management API on a non-loopback
+    // interface. An explicit admin_token is required to widen the bind.
+    let bind_is_loopback = common
+        .listen
+        .parse::<IpAddr>()
+        .map(|addr| addr.is_loopback())
+        .unwrap_or(false);
+    if !bind_is_loopback && common.admin_token.is_empty() {
+        eprintln!(
+            "{}",
+            common_log::error(
+                "lan-mdns",
+                "refusing non-loopback listen without server.admin_token (F-F05)"
+            )
+        );
+        std::process::exit(1);
+    }
+
     // Test-isolation overrides are applied only to the running engine, so
     // `--cli` above always reports the config file's own values.
     apply_overrides(&mut mdns);
-    let engine = match Engine::start(mdns) {
-        Ok(engine) => engine,
+
+    // --- M2.2 runtime state ------------------------------------------------
+    let log_dir = env_or("LAN_STUDIO_LOG_DIR", "logs");
+    let auth_file = env_or("LAN_STUDIO_AUTH_FILE", "auth.toml");
+    let history_dir = env_or("LAN_STUDIO_HISTORY_DIR", "config_history");
+    let max_bytes = get_u64(&flat, "logging.max_bytes", 1_048_576);
+    let backup_count = get_u32(&flat, "logging.backup_count", 3);
+    let history_limit = get_u32(&flat, "observability.history_limit", 30) as usize;
+    let aging_ttl_s = std::env::var("LAN_MDNS_AGING_TTL_S")
+        .ok()
+        .and_then(|value| value.parse::<f64>().ok())
+        .unwrap_or(DEFAULT_AGING_TTL_S);
+
+    let rotating = match RotatingFile::new(&log_dir, "lan-mdns.log", max_bytes, backup_count) {
+        Ok(file) => Some(file),
+        Err(error) => {
+            eprintln!(
+                "{}",
+                common_log::warning("lan-mdns", &format!("disk logging disabled: {}", error))
+            );
+            None
+        }
+    };
+    let log_buffer = Arc::new(LogBuffer::new(512, rotating));
+    let _ = LOGS.set(Arc::clone(&log_buffer));
+
+    let password = match PasswordManager::load(&auth_file) {
+        Ok(manager) => manager,
         Err(error) => {
             eprintln!(
                 "{}",
                 common_log::error(
                     "lan-mdns",
-                    &format!("mDNS engine failed to start: {}", error)
+                    &format!("cannot load admin password file: {}", error)
                 )
             );
+            std::process::exit(1);
+        }
+    };
+    let store = match ConfigStore::new(
+        &path,
+        &history_dir,
+        history_limit,
+        &common.component,
+        text.clone(),
+    ) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!(
+                "{}",
+                common_log::error(
+                    "lan-mdns",
+                    &format!("cannot init config history: {}", error)
+                )
+            );
+            std::process::exit(1);
+        }
+    };
+    let health = HealthMonitor::start(mdns.health_targets.clone(), HEALTH_INTERVAL_S);
+    let state = Arc::new(State {
+        store,
+        log_buffer: Arc::clone(&log_buffer),
+        password: Arc::clone(&password),
+        health: Arc::clone(&health),
+        aging_ttl_s,
+        gateway_enabled: false, // M2.3 owns the real gateway
+    });
+    let _ = STATE.set(Arc::clone(&state));
+
+    let engine = match Engine::start(mdns) {
+        Ok(engine) => engine,
+        Err(error) => {
+            emit("error", &format!("mDNS engine failed to start: {}", error));
             std::process::exit(1);
         }
     };
@@ -128,20 +228,26 @@ fn main() {
     let mdns_port = engine.config().port;
     let _ = ENGINE.set(Arc::clone(&engine));
 
-    let health = Arc::new(Health::new());
+    let health_state = Arc::new(Health::new());
     let metrics = Registry::new("lan-mdns");
     metrics.set_build_info(version, commit, &target);
     declare_mdns_metrics(&metrics);
 
+    // `Arc::clone(&x)` pins the receiver to `&Arc<Concrete>`; use `x.clone()`
+    // so the unsize coercion to the trait object happens on the returned value.
+    let events: Arc<dyn EventSource> = log_buffer.clone();
+    let guard: Arc<dyn common_auth::PasswordGuard> = password.clone();
     let ctx = Arc::new(Context {
-        component: "lan-mdns".to_string(),
+        component: common.component.clone(),
         version: version.to_string(),
         started: Instant::now(),
         metrics,
-        health: Arc::clone(&health),
+        health: Arc::clone(&health_state),
         admin_token: common.admin_token.clone(),
         config_raw: text,
         webui: common.webui,
+        events: Some(events),
+        password: Some(guard),
     });
 
     let app = App::new()
@@ -151,40 +257,70 @@ fn main() {
         .route("GET", "/api/status", view_status)
         .route("GET", "/api/metrics", view_metrics)
         .route("GET", "/api/config", view_config)
+        .route_write("POST", "/api/config", view_config_save)
+        .route("GET", "/api/config/snapshot", view_snapshot_export)
+        .route_write("POST", "/api/config/snapshot", view_snapshot_import)
+        .route("GET", "/api/config/history", view_history)
+        .route_write("POST", "/api/config/rollback", view_rollback)
+        .route_write("POST", "/api/reload", view_reload)
+        .route("GET", "/api/logs", view_logs)
+        .route("GET", "/api/logs/stream", view_logs_stream)
+        .route("GET", "/api/alerts", view_alerts)
         .route("GET", "/api/auth", view_auth)
+        .route("POST", "/api/auth/password", view_auth_password)
+        .route("POST", "/api/auth/verify", view_auth_verify)
         .route("GET", "/api/records", view_records)
         .route("GET", "/api/interfaces", view_interfaces)
         .route("GET", "/api/queries", view_queries)
         .route("GET", "/api/browse", view_browse)
+        .route("GET", "/api/conflicts", view_conflicts)
+        .route("GET", "/api/health/targets", view_health_targets)
         .route("POST", "/api/probe", view_probe);
 
     signals::install();
-    spawn_shutdown_watchdog();
+    spawn_watchdog();
 
-    let addr = format!("{}:{}", common.listen, port_from_env());
-    health.mark_ready();
-    eprintln!(
-        "{}",
-        common_log::info(
-            "lan-mdns",
-            &format!(
-                "mDNS {}:{} ready, HTTP {}, {} records / {} services",
-                group, mdns_port, addr, record_count, service_count
-            )
-        )
+    let port = port_from_env(common.port);
+    let addr = format!("{}:{}", common.listen, port);
+    // First /api/health/targets read should carry real state, not "unknown".
+    health.probe_now();
+    health_state.mark_ready();
+    emit(
+        "info",
+        &format!(
+            "mDNS {}:{} ready, HTTP {}, {} records / {} services, password_set={}",
+            group,
+            mdns_port,
+            addr,
+            record_count,
+            service_count,
+            password.is_set()
+        ),
     );
     if let Err(error) = app.serve(&addr, ctx) {
-        eprintln!(
-            "{}",
-            common_log::error("lan-mdns", &format!("server failed: {}", error))
-        );
+        emit("error", &format!("server failed: {}", error));
         std::process::exit(1);
     }
 }
 
-/// Read, offline-validate and split a config into its common and component
-/// namespaces. No socket is touched here (F-E02).
-fn load_and_validate(path: &str) -> Result<(String, Config, MdnsConfig), String> {
+fn env_or(key: &str, default: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+/// Emit one structured record to stderr and to the bounded SSE/disk buffer.
+fn emit(level: &str, msg: &str) {
+    let line = common_log::record(level, "lan-mdns", msg, &[], None);
+    eprintln!("{}", line);
+    if let Some(buffer) = LOGS.get() {
+        buffer.append(line);
+    }
+}
+
+/// Read, offline-validate and split a config into common + component
+/// namespaces. No socket or file is written here (F-E02).
+fn load_and_validate(
+    path: &str,
+) -> Result<(String, HashMap<String, String>, Config, MdnsConfig), String> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(_) => {
@@ -205,12 +341,11 @@ fn load_and_validate(path: &str) -> Result<(String, Config, MdnsConfig), String>
         ..Config::default()
     };
     apply_flat(&mut common, &flat);
-    Ok((text, common, mdns))
+    Ok((text, flat, common, mdns))
 }
 
-/// Test-isolation hooks. Production keeps the frozen YAML schema untouched;
-/// these env vars only exist so CI / local smoke tests never emit real mDNS
-/// traffic onto the LAN (see docs/ADR/0002).
+/// Test-isolation hooks (docs/ADR/0002). Production keeps the frozen YAML
+/// schema untouched; these only keep CI smoke traffic off the real LAN.
 fn apply_overrides(mdns: &mut MdnsConfig) {
     if let Some(port) = std::env::var("LAN_MDNS_PORT")
         .ok()
@@ -230,20 +365,73 @@ fn apply_overrides(mdns: &mut MdnsConfig) {
     }
 }
 
-fn spawn_shutdown_watchdog() {
+/// F-E03: validate a config text, then hot-swap declarative records and
+/// health targets. Socket-level changes still require a restart.
+fn apply_config_text(text: &str, reason: &str) -> Result<(), String> {
+    let flat = validate_text(text).map_err(|e| format!("common config invalid: {}", e))?;
+    let mut mdns =
+        MdnsConfig::from_flat(&flat).map_err(|e| format!("mdns config invalid: {}", e))?;
+    let state = STATE.get().ok_or("state not ready")?;
+    let engine = ENGINE.get().ok_or("mDNS engine not ready")?;
+    apply_overrides(&mut mdns);
+    engine.reload(mdns.clone());
+    state.health.replace_targets(mdns.health_targets.clone());
+    state.store.set_raw(text);
+    state.store.inc_reloads();
+    emit("info", &format!("config reloaded ({})", reason));
+    Ok(())
+}
+
+/// F-E03: reload because the on-disk file changed outside the process.
+fn reload_from_disk() {
+    let Some(state) = STATE.get() else {
+        return;
+    };
+    let text = match fs::read_to_string(state.store.path()) {
+        Ok(text) => text,
+        Err(_) => return,
+    };
+    if text == state.store.raw() {
+        return;
+    }
+    if let Err(error) = apply_config_text(&text, "file-change") {
+        emit(
+            "warning",
+            &format!("config file reload rejected: {}", error),
+        );
+    }
+}
+
+fn spawn_watchdog() {
     std::thread::spawn(|| loop {
         if signals::triggered() {
             if let Some(engine) = ENGINE.get() {
                 engine.shutdown();
             }
-            eprintln!(
-                "{}",
-                common_log::info("lan-mdns", "shutdown signal received, goodbye sent")
-            );
+            if let Some(state) = STATE.get() {
+                state.health.shutdown();
+            }
+            emit("info", "shutdown signal received, goodbye sent");
             std::process::exit(0);
         }
-        std::thread::sleep(Duration::from_millis(100));
+        if signals::take_hup() {
+            reload_from_disk();
+        }
+        // Cheap polling of the config file; content comparison prevents a
+        // redundant reload right after our own atomic save.
+        reload_from_disk();
+        if let Some(engine) = ENGINE.get() {
+            engine.purge_expired(unix_now(), 300.0);
+        }
+        std::thread::sleep(Duration::from_millis(500));
     });
+}
+
+fn unix_now() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64()
 }
 
 fn declare_mdns_metrics(metrics: &Registry) {
@@ -251,9 +439,34 @@ fn declare_mdns_metrics(metrics: &Registry) {
     metrics.declare_counter("responses_total", "mDNS responses sent");
     metrics.declare_counter("announces_total", "mDNS proactive announcements");
     metrics.declare_counter("probe_total", "mDNS active probes by result");
+    metrics.declare_counter("bytes_total", "mDNS bytes by direction");
     metrics.declare_gauge("records", "Published mDNS records by type");
     metrics.declare_gauge("query_audit_entries", "Query audit ring buffer size");
     metrics.declare_gauge("browse_instances", "Observed LAN service instances");
+    metrics.declare_gauge("health_targets", "Business health targets by state");
+    metrics.declare_gauge("conflicts", "Name conflicts currently registered");
+    metrics.declare_gauge("config_history_versions", "Retained config snapshots");
+    metrics.declare_gauge("auth_password_enabled", "Admin password initialized");
+    metrics.declare_gauge("gateway_enabled", "HTTP gateway global switch (M2.3)");
+}
+
+// ---------------------------------------------------------------- helpers
+
+fn engine_or_503(req: &Request) -> Result<&'static Arc<Engine>, Response> {
+    ENGINE
+        .get()
+        .ok_or_else(|| err(req, "internal_error", "mDNS engine not running", 503))
+}
+
+fn state_or_503(req: &Request) -> Result<&'static Arc<State>, Response> {
+    STATE
+        .get()
+        .ok_or_else(|| err(req, "internal_error", "runtime state not ready", 503))
+}
+
+fn json_str_array(items: &[String]) -> String {
+    let parts: Vec<String> = items.iter().map(|item| json_quote(item)).collect();
+    format!("[{}]", parts.join(","))
 }
 
 // ---------------------------------------------------------------- handlers
@@ -263,7 +476,7 @@ fn view_healthz(_: &Request, _: &Context) -> Response {
 }
 
 fn view_readyz(req: &Request, ctx: &Context) -> Response {
-    if ctx.health.is_ready() && ENGINE.get().is_some() {
+    if ctx.health.is_ready() && ENGINE.get().is_some() && STATE.get().is_some() {
         ok(req, "{\"ready\":true}")
     } else {
         err(req, "internal_error", "not ready", 503)
@@ -272,6 +485,10 @@ fn view_readyz(req: &Request, ctx: &Context) -> Response {
 
 fn view_status(req: &Request, ctx: &Context) -> Response {
     let uptime = ctx.started.elapsed().as_secs_f64();
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
     let (protocol, records, stats, group, mdns_port, interface_mode) = match ENGINE.get() {
         Some(engine) => {
             let cfg = engine.config();
@@ -293,8 +510,12 @@ fn view_status(req: &Request, ctx: &Context) -> Response {
             String::new(),
         ),
     };
+    let (up, down, unknown) = state.health.counts();
+    let conflicts = ENGINE
+        .get()
+        .map_or(0, |engine| state.conflicts(engine).len());
     let data = format!(
-        "{{\"component\":{},\"version\":{},\"running\":true,\"uptime\":{:.3},\"protocol\":{},\"records\":{},\"group\":{},\"mdns_port\":{},\"interface_mode\":{},\"queries\":{},\"responses\":{},\"ingested\":{},\"announces\":{},\"malformed\":{}}}",
+        "{{\"component\":{},\"version\":{},\"running\":true,\"uptime\":{:.3},\"protocol\":{},\"records\":{},\"group\":{},\"mdns_port\":{},\"interface_mode\":{},\"queries\":{},\"responses\":{},\"ingested\":{},\"announces\":{},\"malformed\":{},\"bytes_in\":{},\"bytes_out\":{},\"security\":{{\"token_required\":{},\"password_set\":{},\"write_protection\":true}},\"history\":{{\"versions\":{},\"limit\":{}}},\"health\":{{\"up\":{},\"down\":{},\"unknown\":{}}},\"conflicts\":{},\"config_saves\":{},\"config_reloads\":{},\"alerts\":{{\"enabled\":false}},\"logs\":{{\"buffered\":{},\"capacity\":{},\"disk_bytes\":{},\"disk_limit_bytes\":{}}}}}",
         json_quote(&ctx.component),
         json_quote(&ctx.version),
         uptime,
@@ -308,6 +529,22 @@ fn view_status(req: &Request, ctx: &Context) -> Response {
         stats.ingested,
         stats.announces,
         stats.malformed,
+        stats.bytes_in,
+        stats.bytes_out,
+        !ctx.admin_token.is_empty(),
+        state.password.is_set(),
+        state.store.history_len(),
+        state.store.history_limit(),
+        up,
+        down,
+        unknown,
+        conflicts,
+        state.store.saves(),
+        state.store.reloads(),
+        state.log_buffer.len(),
+        state.log_buffer.capacity(),
+        state.log_buffer.disk_bytes(),
+        state.log_buffer.disk_limit_bytes(),
     );
     ok(req, &data)
 }
@@ -315,7 +552,8 @@ fn view_status(req: &Request, ctx: &Context) -> Response {
 fn view_metrics(_: &Request, ctx: &Context) -> Response {
     ctx.metrics
         .set("uptime_seconds", &[], ctx.started.elapsed().as_secs_f64());
-    if let Some(engine) = ENGINE.get() {
+    let state = STATE.get();
+    if let (Some(engine), Some(state)) = (ENGINE.get(), state) {
         ctx.metrics.set("up", &[], 1.0);
         let stats = engine.stats_snapshot();
         ctx.metrics.set_counter("queries_total", &[], stats.queries);
@@ -323,6 +561,10 @@ fn view_metrics(_: &Request, ctx: &Context) -> Response {
             .set_counter("responses_total", &[], stats.responses);
         ctx.metrics
             .set_counter("announces_total", &[], stats.announces);
+        ctx.metrics
+            .set_counter("bytes_total", &[("direction", "in")], stats.bytes_in);
+        ctx.metrics
+            .set_counter("bytes_total", &[("direction", "out")], stats.bytes_out);
         let records = engine.records_snapshot();
         ctx.metrics.set("records", &[], records.len() as f64);
         for rtype in [TYPE_A, TYPE_AAAA, TYPE_PTR, TYPE_SRV, TYPE_TXT] {
@@ -340,24 +582,344 @@ fn view_metrics(_: &Request, ctx: &Context) -> Response {
             &[],
             engine.observed_snapshot().len() as f64,
         );
+        let (up, down, unknown) = state.health.counts();
+        ctx.metrics
+            .set("health_targets", &[("state", "up")], up as f64);
+        ctx.metrics
+            .set("health_targets", &[("state", "down")], down as f64);
+        ctx.metrics
+            .set("health_targets", &[("state", "unknown")], unknown as f64);
+        ctx.metrics
+            .set("conflicts", &[], state.conflicts(engine).len() as f64);
+        ctx.metrics.set(
+            "config_history_versions",
+            &[],
+            state.store.history_len() as f64,
+        );
+        ctx.metrics.set(
+            "auth_password_enabled",
+            &[],
+            if state.password.is_set() { 1.0 } else { 0.0 },
+        );
+        ctx.metrics.set(
+            "gateway_enabled",
+            &[],
+            if state.gateway_enabled { 1.0 } else { 0.0 },
+        );
+        ctx.metrics
+            .set_counter("config_saves_total", &[], state.store.saves());
+        ctx.metrics
+            .set_counter("config_reloads_total", &[], state.store.reloads());
     } else {
         ctx.metrics.set("up", &[], 0.0);
     }
-    Response {
-        status: 200,
-        content_type: "text/plain; version=0.0.4; charset=utf-8".to_string(),
-        body: ctx.metrics.render(),
+    if let Some(state) = state {
+        ctx.metrics
+            .set("log_disk_bytes", &[], state.log_buffer.disk_bytes() as f64);
+        ctx.metrics.set(
+            "log_disk_limit_bytes",
+            &[],
+            state.log_buffer.disk_limit_bytes() as f64,
+        );
     }
+    Response::body(
+        200,
+        "text/plain; version=0.0.4; charset=utf-8",
+        ctx.metrics.render(),
+    )
 }
 
-fn view_config(req: &Request, ctx: &Context) -> Response {
-    let data = format!("{{\"raw\":{}}}", json_quote(&ctx.config_raw));
-    ok(req, &data)
+fn view_config(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let raw = state.store.raw();
+    let structured = match validate_text(&raw) {
+        Ok(flat) => {
+            let cfg = Config {
+                raw: raw.clone(),
+                ..Config::default()
+            };
+            let mut cfg = cfg;
+            apply_flat(&mut cfg, &flat);
+            format!(
+                "{{\"component\":{},\"listen\":{},\"port\":{},\"webui\":{},\"token_required\":{}}}",
+                json_quote(&cfg.component),
+                json_quote(&cfg.listen),
+                cfg.port,
+                cfg.webui,
+                !cfg.admin_token.is_empty(),
+            )
+        }
+        Err(_) => "null".to_string(),
+    };
+    ok(
+        req,
+        &format!(
+            "{{\"raw\":{},\"structured\":{}}}",
+            json_quote(&raw),
+            structured
+        ),
+    )
+}
+
+fn view_config_save(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let text = match store::json_str(&req.body, "text") {
+        Some(text) => text,
+        None => return err(req, "invalid_config", "config text is required", 400),
+    };
+    let snapshot_id = match state.store.save(&text, "save") {
+        Ok(id) => id,
+        Err(error) => return err(req, error.code, &error.message, 400),
+    };
+    if let Err(error) = apply_config_text(&text, "api-save") {
+        return err(req, "internal_error", &error, 500);
+    }
+    ok(
+        req,
+        &format!(
+            "{{\"saved\":true,\"snapshot\":{},\"config_saves\":{},\"config_reloads\":{}}}",
+            json_quote(&snapshot_id),
+            state.store.saves(),
+            state.store.reloads()
+        ),
+    )
+}
+
+fn view_snapshot_export(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    // `?id=` reads one retained snapshot; without it we export the live config.
+    if let Some(id) = query_param(&req.query, "id") {
+        return match state.store.read_snapshot(&id) {
+            Ok(snap) => ok(req, &snap.to_json()),
+            Err(error) => {
+                let status = if error.code == "not_found" { 404 } else { 400 };
+                err(req, error.code, &error.message, status)
+            }
+        };
+    }
+    let reason = store::json_str(&req.body, "reason")
+        .or_else(|| query_param(&req.query, "reason"))
+        .unwrap_or_else(|| "manual".to_string());
+    let snap = state.store.export(&reason);
+    ok(req, &snap.to_json())
+}
+
+fn view_snapshot_import(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let snap = match Snapshot::from_json(&req.body) {
+        Ok(snap) => snap,
+        Err(error) => return err(req, error.code, &error.message, 400),
+    };
+    let text = match state.store.import(&snap) {
+        Ok(text) => text,
+        Err(error) => return err(req, error.code, &error.message, 400),
+    };
+    if let Err(error) = apply_config_text(&text, "api-import") {
+        return err(req, "internal_error", &error, 500);
+    }
+    ok(
+        req,
+        &format!(
+            "{{\"imported\":true,\"reason\":{},\"config_saves\":{}}}",
+            json_quote(&snap.reason),
+            state.store.saves()
+        ),
+    )
+}
+
+fn view_history(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let entries = state.store.list();
+    let items: Vec<String> = entries
+        .iter()
+        .map(|entry| {
+            format!(
+                "{{\"id\":{},\"created_at\":{},\"reason\":{},\"checksum\":{},\"size\":{}}}",
+                json_quote(&entry.id),
+                json_quote(&entry.created_at),
+                json_quote(&entry.reason),
+                json_quote(&entry.checksum),
+                entry.size
+            )
+        })
+        .collect();
+    let total = items.len();
+    ok(
+        req,
+        &format!(
+            "{{\"history\":[{}],\"total\":{},\"limit\":{}}}",
+            items.join(","),
+            total,
+            state.store.history_limit()
+        ),
+    )
+}
+
+fn view_rollback(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let id = store::json_str(&req.body, "id")
+        .or_else(|| query_param(&req.query, "id"))
+        .unwrap_or_default();
+    if id.is_empty() {
+        return err(req, "invalid_config", "snapshot id is required", 400);
+    }
+    let text = match state.store.rollback(&id) {
+        Ok(text) => text,
+        Err(error) => {
+            let status = if error.code == "not_found" { 404 } else { 400 };
+            return err(req, error.code, &error.message, status);
+        }
+    };
+    if let Err(error) = apply_config_text(&text, "api-rollback") {
+        return err(req, "internal_error", &error, 500);
+    }
+    ok(
+        req,
+        &format!(
+            "{{\"rolled_back\":true,\"id\":{},\"config_saves\":{}}}",
+            json_quote(&id),
+            state.store.saves()
+        ),
+    )
+}
+
+fn view_reload(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let text = match fs::read_to_string(state.store.path()) {
+        Ok(text) => text,
+        Err(error) => return err(req, "internal_error", &error.to_string(), 500),
+    };
+    if let Err(error) = apply_config_text(&text, "manual-reload") {
+        return err(req, "invalid_config", &error, 400);
+    }
+    ok(
+        req,
+        &format!(
+            "{{\"reloaded\":true,\"config_reloads\":{}}}",
+            state.store.reloads()
+        ),
+    )
+}
+
+fn view_logs(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let limit = query_param(&req.query, "limit")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(200)
+        .clamp(1, 1000);
+    let lines = state.log_buffer.recent(limit);
+    let total = lines.len();
+    ok(
+        req,
+        &format!(
+            "{{\"logs\":[{}],\"total\":{},\"capacity\":{},\"disk_bytes\":{},\"disk_limit_bytes\":{}}}",
+            lines.join(","),
+            total,
+            state.log_buffer.capacity(),
+            state.log_buffer.disk_bytes(),
+            state.log_buffer.disk_limit_bytes()
+        ),
+    )
+}
+
+fn view_logs_stream(_: &Request, _: &Context) -> Response {
+    Response::event_stream(SseSpec {
+        replay: 5,
+        idle_timeout: Duration::from_millis(400),
+        max_duration: Duration::from_secs(30),
+        max_events: 200,
+    })
+}
+
+fn view_alerts(req: &Request, _: &Context) -> Response {
+    // Full dispatcher lands in M2.3; the endpoint and its state shape are
+    // part of the frozen M0 contract, so it is registered now.
+    ok(
+        req,
+        "{\"enabled\":false,\"queued\":0,\"sent\":0,\"failed\":0,\"note\":\"M2.3\"}",
+    )
 }
 
 fn view_auth(req: &Request, ctx: &Context) -> Response {
-    let data = format!("{{\"token_required\":{}}}", !ctx.admin_token.is_empty());
-    ok(req, &data)
+    let password_set = STATE.get().is_some_and(|state| state.password.is_set());
+    ok(
+        req,
+        &format!(
+            "{{\"token_required\":{},\"password_set\":{},\"write_protection\":true}}",
+            !ctx.admin_token.is_empty(),
+            password_set
+        ),
+    )
+}
+
+fn view_auth_password(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let new_password = match store::json_str(&req.body, "new_password") {
+        Some(value) => value,
+        None => return err(req, "invalid_config", "new_password is required", 400),
+    };
+    if let Err(error) = common_auth::validate_password(&new_password) {
+        return err(req, "invalid_config", &error.to_string(), 400);
+    }
+    if state.password.is_set() {
+        let current = store::json_str(&req.body, "current_password")
+            .or_else(|| req.headers.get("x-admin-password").cloned())
+            .unwrap_or_default();
+        if !state.password.verify(&current) {
+            return err(req, "auth_failed", "current password does not match", 403);
+        }
+        if let Err(error) = state.password.change(&current, &new_password) {
+            return err(req, "auth_failed", &error.to_string(), 403);
+        }
+    } else if let Err(error) = state.password.set(&new_password) {
+        return err(req, "auth_failed", &error.to_string(), 403);
+    }
+    emit("info", "admin password updated");
+    ok(req, "{\"password_set\":true,\"changed\":true}")
+}
+
+fn view_auth_verify(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    if !state.password.is_set() {
+        return err(req, "auth_failed", "admin password not initialized", 403);
+    }
+    let password = store::json_str(&req.body, "password")
+        .or_else(|| req.headers.get("x-admin-password").cloned())
+        .unwrap_or_default();
+    if !state.password.verify(&password) {
+        return err(req, "auth_failed", "invalid admin password", 403);
+    }
+    ok(req, "{\"valid\":true}")
 }
 
 fn view_index(_: &Request, ctx: &Context) -> Response {
@@ -366,12 +928,6 @@ fn view_index(_: &Request, ctx: &Context) -> Response {
     } else {
         Response::text(404, "webui disabled".to_string())
     }
-}
-
-fn engine_or_503(req: &Request) -> Result<&'static Arc<Engine>, Response> {
-    ENGINE
-        .get()
-        .ok_or_else(|| err(req, "internal_error", "mDNS engine not running", 503))
 }
 
 fn view_records(req: &Request, _: &Context) -> Response {
@@ -436,6 +992,19 @@ fn view_queries(req: &Request, _: &Context) -> Response {
     if entries.len() > limit {
         entries = entries.split_off(entries.len() - limit);
     }
+    if query_param(&req.query, "export").as_deref() == Some("csv") {
+        let mut csv = String::from("ts,source,name,qtype\n");
+        for entry in &entries {
+            csv.push_str(&format!(
+                "{:.3},{},{},{}\n",
+                entry.ts,
+                csv_field(&entry.source),
+                csv_field(&entry.name),
+                csv_field(&entry.qtype)
+            ));
+        }
+        return Response::text(200, csv);
+    }
     let items: Vec<String> = entries
         .iter()
         .map(|entry| {
@@ -450,7 +1019,12 @@ fn view_queries(req: &Request, _: &Context) -> Response {
         .collect();
     ok(
         req,
-        &format!("{{\"queries\":[{}],\"total\":{}}}", items.join(","), total),
+        &format!(
+            "{{\"queries\":[{}],\"total\":{},\"limit\":{}}}",
+            items.join(","),
+            total,
+            limit
+        ),
     )
 }
 
@@ -459,24 +1033,129 @@ fn view_browse(req: &Request, _: &Context) -> Response {
         Ok(engine) => engine,
         Err(response) => return response,
     };
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
     let items: Vec<String> = engine
         .observed_snapshot()
         .iter()
         .map(|entry| {
             format!(
-                "{{\"ts\":{:.3},\"source\":{},\"name\":{},\"type\":{},\"value\":{}}}",
+                "{{\"ts\":{:.3},\"source\":{},\"name\":{},\"type\":{},\"value\":{},\"ttl\":{}}}",
                 entry.ts,
                 json_quote(&entry.source),
                 json_quote(&entry.name),
                 json_quote(type_name(entry.rtype)),
-                json_quote(&entry.value)
+                json_quote(&entry.value),
+                entry.ttl
+            )
+        })
+        .collect();
+    let total = items.len();
+    let groups = state.service_map(engine);
+    let group_json: Vec<String> = groups
+        .iter()
+        .map(|group| {
+            let instances: Vec<String> = group
+                .instances
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{{\"name\":{},\"value\":{},\"source\":{},\"ts\":{:.3}}}",
+                        json_quote(&item.name),
+                        json_quote(&item.value),
+                        json_quote(&item.source),
+                        item.ts
+                    )
+                })
+                .collect();
+            format!(
+                "{{\"service_type\":{},\"instances\":[{}],\"count\":{}}}",
+                json_quote(&group.service_type),
+                instances.join(","),
+                group.count
+            )
+        })
+        .collect();
+    ok(
+        req,
+        &format!(
+            "{{\"browse\":[{}],\"total\":{},\"services\":[{}],\"service_types\":{}}}",
+            items.join(","),
+            total,
+            group_json.join(","),
+            groups.len()
+        ),
+    )
+}
+
+fn view_conflicts(req: &Request, _: &Context) -> Response {
+    let engine = match engine_or_503(req) {
+        Ok(engine) => engine,
+        Err(response) => return response,
+    };
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let conflicts = state.conflicts(engine);
+    let items: Vec<String> = conflicts
+        .iter()
+        .map(|conflict| {
+            format!(
+                "{{\"name\":{},\"type\":{},\"rtype\":{},\"values\":{},\"sources\":{}}}",
+                json_quote(&conflict.name),
+                json_quote(&conflict.rtype_name),
+                conflict.rtype,
+                json_str_array(&conflict.values),
+                json_str_array(&conflict.sources)
             )
         })
         .collect();
     let total = items.len();
     ok(
         req,
-        &format!("{{\"browse\":[{}],\"total\":{}}}", items.join(","), total),
+        &format!(
+            "{{\"conflicts\":[{}],\"total\":{}}}",
+            items.join(","),
+            total
+        ),
+    )
+}
+
+fn view_health_targets(req: &Request, _: &Context) -> Response {
+    let state = match state_or_503(req) {
+        Ok(state) => state,
+        Err(response) => return response,
+    };
+    let targets = state.health.snapshot();
+    let items: Vec<String> = targets
+        .iter()
+        .map(|status| {
+            format!(
+                "{{\"alias\":{},\"host\":{},\"port\":{},\"state\":{},\"checked_at\":{:.3},\"latency_ms\":{:.3}}}",
+                json_quote(&status.alias),
+                json_quote(&status.host),
+                status.port,
+                json_quote(&status.state),
+                status.checked_at,
+                status.latency_ms
+            )
+        })
+        .collect();
+    let (up, down, unknown) = state.health.counts();
+    let total = items.len();
+    ok(
+        req,
+        &format!(
+            "{{\"targets\":[{}],\"total\":{},\"up\":{},\"down\":{},\"unknown\":{}}}",
+            items.join(","),
+            total,
+            up,
+            down,
+            unknown
+        ),
     )
 }
 
@@ -485,7 +1164,7 @@ fn view_probe(req: &Request, ctx: &Context) -> Response {
         Ok(engine) => engine,
         Err(response) => return response,
     };
-    let name = json_string_field(&req.body, "name")
+    let name = store::json_str(&req.body, "name")
         .or_else(|| query_param(&req.query, "name"))
         .unwrap_or_default();
     if name.is_empty() {
@@ -494,11 +1173,12 @@ fn view_probe(req: &Request, ctx: &Context) -> Response {
     if validate_name(&name).is_err() {
         return err(req, "invalid_config", "probe name is invalid", 400);
     }
-    let type_text = json_string_field(&req.body, "type")
+    let type_text = store::json_str(&req.body, "type")
         .or_else(|| query_param(&req.query, "type"))
         .unwrap_or_else(|| "PTR".to_string());
     let qtype = parse_qtype(&type_text);
-    let unicast = json_bool_field(&req.body, "unicast")
+    let unicast = store::json_str(&req.body, "unicast")
+        .map(|value| value == "true" || value == "1")
         .or_else(|| query_param(&req.query, "unicast").map(|v| v == "1" || v == "true"))
         .unwrap_or(false);
     match engine.probe(&name, qtype, unicast, PROBE_TIMEOUT_MS) {
@@ -537,6 +1217,14 @@ fn view_probe(req: &Request, ctx: &Context) -> Response {
 }
 
 // ----------------------------------------------------------- tiny parsers
+
+fn csv_field(value: &str) -> String {
+    if value.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
+}
 
 fn parse_qtype(text: &str) -> u16 {
     match text.trim().to_ascii_uppercase().as_str() {
@@ -585,52 +1273,6 @@ fn query_param(query: &str, key: &str) -> Option<String> {
     })
 }
 
-fn json_value_start<'a>(body: &'a str, key: &str) -> Option<&'a str> {
-    let needle = format!("\"{}\"", key);
-    let start = body.find(&needle)? + needle.len();
-    let rest = &body[start..];
-    let colon = rest.find(':')?;
-    Some(rest[colon + 1..].trim_start())
-}
-
-fn json_string_field(body: &str, key: &str) -> Option<String> {
-    let rest = json_value_start(body, key)?;
-    if !rest.starts_with('"') {
-        return None;
-    }
-    let mut out = String::new();
-    let mut escaped = false;
-    for ch in rest[1..].chars() {
-        if escaped {
-            out.push(match ch {
-                'n' => '\n',
-                't' => '\t',
-                'r' => '\r',
-                other => other,
-            });
-            escaped = false;
-            continue;
-        }
-        match ch {
-            '\\' => escaped = true,
-            '"' => return Some(out),
-            other => out.push(other),
-        }
-    }
-    None
-}
-
-fn json_bool_field(body: &str, key: &str) -> Option<bool> {
-    let rest = json_value_start(body, key)?;
-    if rest.starts_with("true") {
-        Some(true)
-    } else if rest.starts_with("false") {
-        Some(false)
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -638,15 +1280,20 @@ mod tests {
     #[test]
     fn parses_probe_body_and_query() {
         let body = r#"{"name":"nas.local","type":"A","unicast":true}"#;
-        assert_eq!(
-            json_string_field(body, "name").as_deref(),
-            Some("nas.local")
-        );
-        assert_eq!(json_string_field(body, "type").as_deref(), Some("A"));
-        assert_eq!(json_bool_field(body, "unicast"), Some(true));
+        assert_eq!(store::json_str(body, "name").as_deref(), Some("nas.local"));
+        assert_eq!(store::json_str(body, "type").as_deref(), Some("A"));
         assert_eq!(parse_qtype("aaaa"), TYPE_AAAA);
         assert_eq!(parse_qtype("ANY"), TYPE_ANY);
         assert_eq!(parse_qtype("nonsense"), TYPE_PTR);
+    }
+
+    #[test]
+    fn json_string_parser_handles_yaml_newlines() {
+        let body = r#"{"text":"version: 1\ncomponent: lan-mdns\n","mode":"raw"}"#;
+        assert_eq!(
+            store::json_str(body, "text").as_deref(),
+            Some("version: 1\ncomponent: lan-mdns\n")
+        );
     }
 
     #[test]
@@ -666,5 +1313,12 @@ mod tests {
     fn invalid_probe_names_are_rejected() {
         assert!(validate_name("nas.local").is_ok());
         assert!(validate_name("bad").is_err());
+    }
+
+    #[test]
+    fn csv_field_quotes_separators() {
+        assert_eq!(csv_field("plain"), "plain");
+        assert_eq!(csv_field("a,b"), "\"a,b\"");
+        assert_eq!(csv_field("a\"b"), "\"a\"\"b\"");
     }
 }

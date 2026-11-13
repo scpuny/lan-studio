@@ -1,0 +1,9 @@
+[package]
+name = "common-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Zero-dependency SHA-256 / HMAC-SHA256 / PBKDF2-HMAC-SHA256 for Lan Studio"
+
+[dependencies]

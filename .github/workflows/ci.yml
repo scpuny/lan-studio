@@ -40,7 +40,7 @@ jobs:
       - name: Build release artifact
         run: cargo build --release -p lan-mdns
 
-      - name: Smoke test artifact (M2.1 runtime, isolated multicast)
+      - name: Smoke test artifact (M2.1 + M2.2 runtime, isolated multicast)
         env:
           LAN_STUDIO_CONFIG: components/lan-mdns/config.template.yaml
           LAN_STUDIO_PORT: "18080"

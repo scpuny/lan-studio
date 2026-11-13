@@ -15,9 +15,16 @@ dependencies = [
 [[package]]
 name = "common-auth"
 version = "0.1.0"
+dependencies = [
+ "common-crypto",
+]
 
 [[package]]
 name = "common-config"
+version = "0.1.0"
+
+[[package]]
+name = "common-crypto"
 version = "0.1.0"
 
 [[package]]
@@ -51,6 +58,7 @@ dependencies = [
  "common-api",
  "common-auth",
  "common-config",
+ "common-crypto",
  "common-dns",
  "common-health",
  "common-log",

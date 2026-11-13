@@ -4,4 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Lan Studio admin token authentication"
+description = "Admin token and admin password guards for Lan Studio /api/* endpoints"
+
+[dependencies]
+common-crypto = { workspace = true }

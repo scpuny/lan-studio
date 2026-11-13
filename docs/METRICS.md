@@ -49,6 +49,14 @@ lanstudio_<c>_<metric>[_<unit>]
 
 **可选单目标指标**：`lanstudio_mdns_health_target_up{target_alias}` 仅在目标配置了**别名**时输出，别名白名单上限 64；未配置别名时不得输出，目标明细走 `/api/health/targets`。
 
+**M2.2 实现状态**：上表 13 个专有族已全部实现并输出。M2.1 交付前 7 个中的 7 个
+（`records` / `queries_total` / `responses_total` / `announces_total` / `probe_total` /
+`query_audit_entries` / `browse_instances`）；M2.2 补齐剩余 6 个
+（`bytes_total` / `health_targets` / `conflicts` / `config_history_versions` /
+`auth_password_enabled` / `gateway_enabled`）。`gateway_enabled` 在 M2.2 恒为 0，
+真实网关全局开关在 M2.3 接入——指标族先登记、后接值，保证 PRD 8.1「第 3 节全部
+存在」可在 M2.4 一次核对。冒烟脚本对 13 个族的存在性、标签取值与双前缀均有断言。
+
 ## 4. 标签规范（强制）
 
 1. `path` 必须是**路由模板**（如 `/api/config/snapshot`），禁止使用原始 URL 或带查询参数的路径。
