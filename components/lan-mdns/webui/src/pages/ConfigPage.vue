@@ -134,7 +134,7 @@
               资源记录
               <span class="ls-hint">A / AAAA / PTR / SRV / TXT；TTL 留 0 表示跟随全局</span>
               <div class="ls-header-spacer"></div>
-              <a-button size="mini" @click="addRecord">新增记录</a-button>
+              <a-button @click="addRecord">新增记录</a-button>
             </div>
             <div v-if="model.mdns.records.length === 0" class="ls-note">尚未发布任何记录。</div>
             <div v-else class="ls-list ls-list--records">
@@ -164,7 +164,7 @@
               服务实例（DNS-SD）
               <span class="ls-hint">自动生成 PTR / SRV / TXT 与服务类型枚举</span>
               <div class="ls-header-spacer"></div>
-              <a-button size="mini" @click="addService">新增服务</a-button>
+              <a-button @click="addService">新增服务</a-button>
             </div>
             <div v-if="model.mdns.services.length === 0" class="ls-note">尚未登记服务实例。</div>
             <div
@@ -226,7 +226,7 @@
               健康目标
               <span class="ls-hint">TCP 连接探测；别名用于指标标签</span>
               <div class="ls-header-spacer"></div>
-              <a-button size="mini" @click="addTarget">新增目标</a-button>
+              <a-button @click="addTarget">新增目标</a-button>
             </div>
             <div v-if="model.mdns.healthTargets.length === 0" class="ls-note">未配置健康目标。</div>
             <div v-else class="ls-list ls-list--health">
@@ -290,7 +290,7 @@
               静态路由覆盖
               <span class="ls-hint">未列出的服务按已发布 A 记录自动生成路由</span>
               <div class="ls-header-spacer"></div>
-              <a-button size="mini" @click="addGatewayHost">新增路由</a-button>
+              <a-button @click="addGatewayHost">新增路由</a-button>
             </div>
             <div v-if="model.mdns.gateway.hosts.length === 0" class="ls-note">无显式路由覆盖。</div>
             <div v-else class="ls-list ls-list--routes">
@@ -333,7 +333,6 @@
               <span class="ls-hint">仅 <code>specified</code> 模式读取此列表</span>
               <div class="ls-header-spacer"></div>
               <a-button
-                size="mini"
                 :disabled="model.mdns.interfaceMode !== 'specified'"
                 @click="model.mdns.interfaces.push('')"
               >
@@ -356,7 +355,7 @@
               运行态网卡
               <span class="ls-hint">来自 <code>/api/interfaces</code></span>
               <div class="ls-header-spacer"></div>
-              <a-button size="mini" @click="loadInterfaces">刷新</a-button>
+              <a-button @click="loadInterfaces">刷新</a-button>
             </div>
             <p v-if="interfaceInfo" class="ls-note">
               当前模式 <code>{{ interfaceInfo.mode }}</code> ·
@@ -368,7 +367,6 @@
               :columns="interfaceColumns"
               :pagination="false"
               :bordered="false"
-              size="small"
               row-key="addr"
             >
               <template #joined="{ record }">

@@ -5,7 +5,7 @@
         版本历史
         <span class="ls-hint">每次保存前自动写入快照；回滚同样先备份当前配置</span>
         <div class="ls-header-spacer"></div>
-        <a-button size="small" :loading="loading" @click="load">刷新</a-button>
+        <a-button :loading="loading" @click="load">刷新</a-button>
       </div>
 
       <a-alert v-if="error" type="error" style="margin-bottom: 12px">{{ error }}</a-alert>
@@ -14,8 +14,8 @@
       </a-alert>
 
       <div class="ls-row" style="margin-bottom: 12px">
-        <a-button size="small" @click="exportCurrent">导出当前配置快照</a-button>
-        <a-button size="small" :loading="importing" @click="pickFile">导入快照文件</a-button>
+        <a-button @click="exportCurrent">导出当前配置快照</a-button>
+        <a-button :loading="importing" @click="pickFile">导入快照文件</a-button>
         <input
           ref="fileInput"
           type="file"
@@ -34,7 +34,6 @@
         :columns="columns"
         :pagination="{ pageSize: 20, size: 'mini' }"
         :bordered="false"
-        size="small"
         row-key="id"
       >
         <template #created_at="{ record }">

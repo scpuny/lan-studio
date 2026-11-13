@@ -5,13 +5,13 @@
         告警通道
         <span class="ls-hint">本地判定 + Webhook 推送，不依赖外部服务</span>
         <div class="ls-header-spacer"></div>
-        <a-button size="small" @click="$emit('goto', 'config')">编辑 Webhook</a-button>
+        <a-button @click="$emit('goto', 'config')">编辑 Webhook</a-button>
       </div>
 
       <a-alert v-if="error" type="error">{{ error }}</a-alert>
 
       <div class="ls-grid" style="margin-bottom: 14px">
-        <div>
+        <div class="ls-metric-card">
           <div class="ls-kpi-label">状态</div>
           <div class="ls-inline">
             <span class="ls-dot" :class="status.enabled ? 'is-up' : 'is-unknown'"></span>
@@ -19,7 +19,7 @@
           </div>
           <div class="ls-kpi-foot">{{ status.webhooks }} 个 Webhook</div>
         </div>
-        <div>
+        <div class="ls-metric-card">
           <div class="ls-kpi-label">队列</div>
           <div class="ls-kpi-value">
             {{ status.queued
@@ -27,31 +27,30 @@
           </div>
           <div class="ls-kpi-foot">有界队列，满则丢弃并计数</div>
         </div>
-        <div>
+        <div class="ls-metric-card">
           <div class="ls-kpi-label">已发送</div>
           <div class="ls-kpi-value">{{ status.sent }}</div>
           <div class="ls-kpi-foot">失败 {{ status.failed }} · 丢弃 {{ status.dropped }}</div>
         </div>
-        <div>
+        <div class="ls-metric-card">
           <div class="ls-kpi-label">冷却抑制</div>
           <div class="ls-kpi-value">{{ status.suppressed }}</div>
           <div class="ls-kpi-foot">窗口 {{ status.cooldown_seconds }} 秒</div>
         </div>
-        <div>
+        <div class="ls-metric-card">
           <div class="ls-kpi-label">重试次数</div>
           <div class="ls-kpi-value">{{ status.retries }}</div>
           <div class="ls-kpi-foot">单事件最多重试 2 次</div>
         </div>
       </div>
 
-      <a-tabs default-active-key="kinds" size="small" type="card-gutter" :destroy-on-hide="false">
+      <a-tabs default-active-key="kinds" type="card-gutter" :destroy-on-hide="false">
         <a-tab-pane key="kinds" title="按事件类型">
           <a-table
             :data="kindRows"
             :columns="kindColumns"
             :pagination="false"
             :bordered="false"
-            size="small"
             row-key="key"
           >
             <template #result="{ record }">
@@ -69,7 +68,7 @@
 
         <a-tab-pane key="gateway" title="网关状态">
           <div class="ls-grid">
-            <div>
+            <div class="ls-metric-card">
               <div class="ls-kpi-label">网关</div>
               <div class="ls-inline">
                 <span class="ls-dot" :class="status.gateway.enabled ? 'is-up' : 'is-unknown'"></span>
@@ -77,15 +76,15 @@
               </div>
               <div class="ls-kpi-foot">{{ status.gateway.routes }} 条静态路由</div>
             </div>
-            <div>
+            <div class="ls-metric-card">
               <div class="ls-kpi-label">请求</div>
               <div class="ls-kpi-value">{{ status.gateway.requests }}</div>
             </div>
-            <div>
+            <div class="ls-metric-card">
               <div class="ls-kpi-label">已转发</div>
               <div class="ls-kpi-value">{{ status.gateway.forwarded }}</div>
             </div>
-            <div>
+            <div class="ls-metric-card">
               <div class="ls-kpi-label">不可达</div>
               <div class="ls-kpi-value">{{ status.gateway.unreachable }}</div>
               <div class="ls-kpi-foot">触发 gateway_target_unreachable 告警</div>
@@ -99,7 +98,6 @@
             :columns="platformColumns"
             :pagination="false"
             :bordered="false"
-            size="small"
             row-key="name"
           >
             <template #match="{ record }">

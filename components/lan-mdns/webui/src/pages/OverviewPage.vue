@@ -49,7 +49,6 @@
         :columns="healthColumns"
         :pagination="false"
         :bordered="false"
-        size="small"
         row-key="key"
       >
         <template #state="{ record }">

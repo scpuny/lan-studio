@@ -4,17 +4,17 @@
       可观测
       <span class="ls-hint">服务地图与审计队列按 TTL 自动老化</span>
       <div class="ls-header-spacer"></div>
-      <a-button size="small" @click="refreshAll">刷新</a-button>
+      <a-button @click="refreshAll">刷新</a-button>
     </div>
 
-    <a-tabs v-model:active-key="tab" size="small" type="card-gutter" :destroy-on-hide="false">
+    <a-tabs v-model:active-key="tab" type="card-gutter" :destroy-on-hide="false">
       <a-tab-pane key="map" title="服务地图">
         <div class="ls-grid" style="margin-bottom: 14px">
-          <div>
+          <div class="ls-metric-card">
             <div class="ls-kpi-label">服务类型</div>
             <div class="ls-kpi-value">{{ browse.service_types }}</div>
           </div>
-          <div>
+          <div class="ls-metric-card">
             <div class="ls-kpi-label">观测条目</div>
             <div class="ls-kpi-value">{{ browse.total }}</div>
           </div>
@@ -50,14 +50,13 @@
         <div class="ls-row" style="margin-bottom: 10px">
           <span class="ls-note">最近 {{ queries.length }} 条查询，环形缓冲有界，不落盘。</span>
           <div class="ls-header-spacer"></div>
-          <a-button size="mini" @click="exportCsv">导出 CSV</a-button>
+          <a-button @click="exportCsv">导出 CSV</a-button>
         </div>
         <a-table
           :data="queries"
           :columns="queryColumns"
           :pagination="{ pageSize: 15, size: 'mini' }"
           :bordered="false"
-          size="small"
           row-key="key"
         >
           <template #ts="{ record }">
@@ -78,7 +77,6 @@
           :columns="conflictColumns"
           :pagination="false"
           :bordered="false"
-          size="small"
           row-key="name"
         >
           <template #values="{ record }">
@@ -103,7 +101,6 @@
           :columns="recordColumns"
           :pagination="{ pageSize: 12, size: 'mini' }"
           :bordered="false"
-          size="small"
           row-key="key"
         >
           <template #empty>
@@ -118,7 +115,7 @@
             Prometheus 文本格式（<code>0.0.4</code>），前缀 <code>lanstudio_mdns_*</code>。
           </span>
           <div class="ls-header-spacer"></div>
-          <a-button size="mini" @click="copyMetrics">复制</a-button>
+          <a-button @click="copyMetrics">复制</a-button>
         </div>
         <pre class="ls-log" style="height: 420px">{{ metricsText || '加载中…' }}</pre>
       </a-tab-pane>

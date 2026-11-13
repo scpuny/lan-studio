@@ -417,7 +417,7 @@ body {
    卡片（双层质感：外壳 + 内核）
    ============================================================ */
 .ls-panel {
-  border: 1px solid var(--ls-line);
+  border: none;
   border-radius: var(--ls-radius);
   background: var(--ls-core);
   padding: 30px 34px;
@@ -851,6 +851,12 @@ body {
 .ls-app .arco-tabs-card .arco-tabs-tab {
   font-size: 14.5px;
   padding: 8px 18px;
+}
+
+/* card-gutter 内容区自带左右 1px 边（gutter 视觉），去掉以保持无边框干净观感 */
+.ls-app .arco-tabs-type-card-gutter .arco-tabs-content {
+  border-left: none;
+  border-right: none;
 }
 
 /* 表格行高放宽，配合放大后的输入框 */
