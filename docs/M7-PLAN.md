@@ -1,7 +1,7 @@
 # M7 方案：lan-webui —— 前后端一体的独立统一控制台
 
 > 依据：用户指令「把 `lan-mdns` 下的 webui 拿出来作为独立的前端项目，作为 `lan-webui`，包含所有模块的功能，同样是后端控制前端显示哪些模块的功能。`lan-webui` 包含自己的 rust 目录作为后端，然后它又是前端，后端可以引入其他模块。」
-> 状态：**方案已落档，待拍板**（2026-11-14）。本文件只定义方案，**未写实现代码**。
+> 状态：**方案已拍板，待开工**（2026-11-14）。三项 ★ 决策均由用户选定为默认 A，登记见 §10；本文件只定义方案，**未写实现代码**。
 > 定位：M7 与 M6 同为工程演进项，**不改 PRD §7.5 的 M0~M5 规格里程碑**，不回退 M6 已销项的任何门禁。
 
 ---
@@ -37,6 +37,8 @@
 ---
 
 ## 3. 决策清单
+
+> ★ 三项已由用户拍板，均选择默认值 A（2026-11-14）；D-M7-4 ~ D-M7-8 按默认采纳。
 
 | 编号 | 决策 | 默认值 | 理由 / 影响 |
 | --- | --- | --- | --- |
@@ -268,7 +270,7 @@ fn view_index(_: &Request, _: &Context) -> Response {
 | **M7.1 Rust 后端** | `main.rs`（4 条路由 + 子命令）、`capabilities.rs`（编译期注入）、`proxy.rs`（复用 M6 代理）、`modules.yaml` 解析与 `--check` 一致性校验 |
 | **M7.2 前端** | `capabilities.ts` + 8 个 widget Vue 组件、`App.vue` 动态导航、M2 六区域作为 `core.*` 保留、`demo.ts` 扩展、`render-check.mjs` 增加负向 DOM 断言 |
 | **M7.3 门禁与文档** | `scripts/test_m7.py`（清单漂移 / 未引入模块零 DOM / 代理白名单 / 写密码透传 / 离线产物）、CI 纳入、`docs/M7-CHECKLIST.md`、`docs/ADR/0009-m7-lan-webui.md`、README 与 ADR 0008 适用范围修订 |
-| **M7.4 全量回归** | fmt / clippy / test、静态契约 34/0、M2 75/0、M3 66/66、M4 76/76、M5 91/0、M6 152/0、生态 91/0、`npm run verify`、9 个二进制、提交并 push |
+| **M7.4 全量回归** | fmt / clippy / test、静态契约 34/0、M2 75/0、M3 66/66、M4 76/76、M5 91/0、M6 152/0、生态 91/0、`npm run verify`、workspace 10 个二进制（含只读兼容的 `lan-shell`）、release 仍 9 个、提交并 push |
 
 ---
 
@@ -286,7 +288,18 @@ fn view_index(_: &Request, _: &Context) -> Response {
 
 | 编号 | 用户选择 | 登记时间 |
 | --- | --- | --- |
-| D-M7-1 | 待拍板 | — |
-| D-M7-2 | 待拍板 | — |
-| D-M7-3 | 待拍板 | — |
-| D-M7-4 ~ D-M7-8 | 默认采纳（如无异议） | — |
+| ★ D-M7-1 | **A：编译期声明 + 同源代理（BFF）** | 2026-11-14 |
+| ★ D-M7-2 | **A：`lan-webui` 取代 `lan-shell` 成为统一出口，8090；`shell/` 保留只读兼容** | 2026-11-14 |
+| ★ D-M7-3 | **A：`git mv` 到 `lan-webui/webui`，产物 `outDir` 不变** | 2026-11-14 |
+| D-M7-4 ~ D-M7-8 | 默认采纳 | 2026-11-14 |
+
+### 10.1 拍板后的确定形态
+
+- `lan-webui/` 是 workspace 根下新增的第 **23** 个 member，一个 Cargo package 编出自己的二进制；同目录内含 `webui/`（Vue 3 + TS + Arco）与 `src/`（Rust 后端）。
+- **8 个 `lan-*` 组件仍是独立进程、独立端口、独立部署**；`lan-webui` 后端只做能力清单合成与有界同源代理，不承载组件业务逻辑。PRD §8.2 生态 DoD 与 M5 销项依据不动。
+- `lan-webui/modules.yaml` 是「后端引入哪些模块」的唯一声明；`gen_capabilities.py --aggregate` 由此合成清单 + 代理白名单，CI 反向校验三者一致。
+- 单文件产物仍是 `common/webui/src/assets/index.html`，`lan-mdns` 与 `lan-webui` 两个二进制共用同一份；M2 的 66/66、75/0、229 项冒烟零回退。
+- `shell/` 源码与 M6 门禁脚本保留在仓库内、可编译可回归，但**不再作为统一出口发布**；`release.yml` 第 9 个二进制由 `lan-shell` 换成 `lan-webui`，发布矩阵仍为 9 × 2 arch。
+- `cargo build --workspace` 产 10 个二进制（含只读兼容的 `lan-shell`），`release.yml` 产 9 个。ADR 0009 需修订 ADR 0008 的 D-M6-1 / D-M6-2 适用范围：M2 Arco 页不再以 iframe 挂载，而是成为 `lan-webui` 本体。
+
+**下一步**：用户显式确认开工后，按 §8 的 M7.0 → M7.4 分批落地实现代码。
