@@ -89,6 +89,25 @@ lanstudio_<c>_<metric>[_<unit>]
 
 所有标签均为**固定枚举或聚合值**，不含 IP / 域名 / 序列号，符合第 4 节基数控制。
 
+## 3.6 M4 组件专有指标
+
+> 两组件共用 `common-component` 运行时，第 2 节 9 项必备族自动输出；下表为各组件业务族。
+
+| 组件 | 指标 | 类型 | 标签 | 说明 |
+| --- | --- | --- | --- | --- |
+| `lan-hosts` | `lanstudio_hosts_mappings` | gauge | — | 已登记映射数（有界 `max_mappings`） |
+| | `lanstudio_hosts_conflicts_total` | counter | — | 同名异 IP / 保留后缀被拒绝次数 |
+| | `lanstudio_hosts_published_total` | counter | — | 成功发布次数 |
+| | `lanstudio_hosts_publish_failed_total` | counter | — | 发布失败次数（旧文件保持完好） |
+| | `lanstudio_hosts_render_bytes` | gauge | — | 上次渲染字节数 |
+| `lan-wol` | `lanstudio_wol_devices` | gauge | — | 已登记设备数 |
+| | `lanstudio_wol_device_state` | gauge | `state` | `unknown` / `waking` / `online` / `offline` 固定枚举 |
+| | `lanstudio_wol_wake_sent_total` | counter | — | 实际发出的 Magic Packet 数 |
+| | `lanstudio_wol_wake_rejected_total` | counter | `reason` | `unregistered` / `cooldown` / `disabled` / `invalid` |
+| | `lanstudio_wol_probe_total` | counter | — | 只读 TCP 探测次数 |
+
+所有标签均为**固定枚举或聚合值**，不含 IP / 域名 / MAC / 设备名，符合第 4 节基数控制。
+
 ## 4. 标签规范（强制）
 
 1. `path` 必须是**路由模板**（如 `/api/config/snapshot`），禁止使用原始 URL 或带查询参数的路径。

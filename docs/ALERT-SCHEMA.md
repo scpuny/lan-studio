@@ -34,7 +34,10 @@
 | `cert_revoked` | `lan-ca` | info | 证书被吊销 | `subject,serial` | 0s |
 | `scan_anomaly` | `lan-scan` | info | 扫描速率或异常响应超阈值 | `segment,reason` | 600s |
 | `sync_conflict` | `lan-sync` | warning | 多节点快照冲突 | `peer,strategy` | 300s |
-| `device_wake_failed` | `lan-wol` | warning | 唤醒后状态探测未上线 | `device` | 300s |
+| `device_wake_failed` | `lan-wol` | warning | 唤醒宽限期结束后仍未上线 | `device` | 300s |
+| `wol_wake_sent` | `lan-wol` | info | 已登记设备唤醒包发送成功 | `device,result` | 0s |
+| `hosts_publish_failed` | `lan-hosts` | warning | 渲染产物发布失败，旧文件保持完好 | `path,reason` | 300s |
+| `hosts_conflict_detected` | `lan-hosts` | warning | 同名异 IP 或 `.local` 保留后缀被拒绝 | `name,reason` | 300s |
 | `ssdp_discovery_error` | `lan-ssdp` | info | 发现应答解析失败 | `reason` | 600s |
 
 ## 3. 平台适配（由 `common-alert` 统一实现）

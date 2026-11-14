@@ -27,7 +27,7 @@ tags:
   - name: auth
     description: Authentication state and password management
   - name: component
-    description: Component-specific endpoints (lan-mdns / M3 relay, ca, scan)
+    description: Component-specific endpoints (lan-mdns / M3 relay, ca, scan / M4 hosts, wol)
 
 paths:
   /healthz:
@@ -610,6 +610,164 @@ paths:
       responses:
         "200":
           description: Started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+  # --- M4: lan-hosts (PRD 4.6, static mappings only, no mDNS) ---
+  /api/hosts/mappings:
+    get:
+      tags: [component]
+      summary: List static name mappings
+      responses:
+        "200":
+          description: Mappings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/hosts/mapping:
+    post:
+      tags: [component]
+      summary: Upsert one name-to-address mapping
+      responses:
+        "200":
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/hosts/remove:
+    post:
+      tags: [component]
+      summary: Remove a mapping by name
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/hosts/import:
+    post:
+      tags: [component]
+      summary: Import mappings from a standard hosts text
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/hosts/render:
+    get:
+      tags: [component]
+      summary: Render mappings as hosts text or structured JSON
+      responses:
+        "200":
+          description: Rendered output
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/hosts/publish:
+    post:
+      tags: [component]
+      summary: Atomically publish rendered hosts text to output_path
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/hosts/status:
+    get:
+      tags: [component]
+      summary: Mapping count, last publish and conflict counters
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+  # --- M4: lan-wol (PRD 4.7, registered devices only) ---
+  /api/wol/devices:
+    get:
+      tags: [component]
+      summary: List registered devices with their debounced state
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/wol/device:
+    post:
+      tags: [component]
+      summary: Upsert a registered device
+      responses:
+        "200":
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/wol/remove:
+    post:
+      tags: [component]
+      summary: Remove a registered device
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/wol/wake:
+    post:
+      tags: [component]
+      summary: Send a magic packet to a registered device id only
+      responses:
+        "200":
+          description: Wake result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/wol/probe:
+    post:
+      tags: [component]
+      summary: Trigger one read-only reachability probe
+      responses:
+        "200":
+          description: Probe result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/wol/status:
+    get:
+      tags: [component]
+      summary: State distribution, cooldown and send counters
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/wol/history:
+    get:
+      tags: [component]
+      summary: Bounded wake and state-transition audit trail
+      responses:
+        "200":
+          description: Audit entries
           content:
             application/json:
               schema:

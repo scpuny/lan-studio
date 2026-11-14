@@ -1,0 +1,14 @@
+[package]
+name = "lan-wol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio wake-on-LAN and device power-state (M4)"
+
+[dependencies]
+common-component = { workspace = true }
+common-config = { workspace = true }
+common-api = { workspace = true }
+common-metrics = { workspace = true }
+common-probe = { workspace = true }

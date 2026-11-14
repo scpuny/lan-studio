@@ -13,10 +13,13 @@ members = [
     "common/webui",
     "common/api",
     "common/component",
+    "common/probe",
     "components/lan-mdns",
     "components/lan-relay",
     "components/lan-ca",
     "components/lan-scan",
+    "components/lan-hosts",
+    "components/lan-wol",
 ]
 
 [workspace.package]
@@ -38,3 +41,4 @@ common-metrics = { path = "common/metrics" }
 common-webui = { path = "common/webui" }
 common-api = { path = "common/api" }
 common-component = { path = "common/component" }
+common-probe = { path = "common/probe" }

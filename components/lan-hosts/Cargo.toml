@@ -1,0 +1,13 @@
+[package]
+name = "lan-hosts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio static name mapping and hosts rendering (M4)"
+
+[dependencies]
+common-component = { workspace = true }
+common-config = { workspace = true }
+common-api = { workspace = true }
+common-metrics = { workspace = true }

@@ -1,0 +1,44 @@
+version: 1
+component: lan-wol
+
+server:
+  listen: "127.0.0.1"
+  port: 8085
+  webui: true
+  admin_token: ""
+  log_level: info
+
+observability:
+  metrics: true
+  alerts: true
+  history_limit: 30
+
+logging:
+  max_bytes: 1048576
+  backup_count: 3
+  level: info
+
+alerts:
+  enabled: true
+  webhooks: []
+  cooldown_seconds: 300
+  timeout_seconds: 5.0
+  max_retries: 2
+
+# --- lan-wol business configuration (PRD 4.7: registered devices only) ---
+wol:
+  # Broadcasting is opt-in; every other feature stays testable while disabled.
+  send_enabled: false
+  broadcast: "255.255.255.255"
+  port: 9
+  devices_path: "lan-wol.devices.json"
+  history_path: "lan-wol.history.json"
+  max_devices: 512
+  cooldown_seconds: 30
+  grace_seconds: 90
+  probe_port_default: 22
+  probe_timeout_ms: 300
+  probe_interval_seconds: 15
+  probe_success_threshold: 3
+  probe_failure_threshold: 3
+  history_limit: 200

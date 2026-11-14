@@ -78,6 +78,15 @@ jobs:
       - name: Unit tests
         run: cargo test --workspace
 
+      - name: Build all component binaries
+        run: cargo build --workspace
+
+      - name: M3 runtime gate (regression)
+        run: python3 scripts/test_m3.py
+
+      - name: M4 runtime gate (hosts / wol + no-overlap)
+        run: python3 scripts/test_m4.py
+
       - name: Build release artifact
         run: cargo build --release -p lan-mdns
 

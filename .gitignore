@@ -19,3 +19,13 @@ data/
 
 # Local agent workspace memory — machine-local, not part of the repo
 .workbuddy/
+
+# Component runtime state (generated on first boot, never committed)
+lan-*.yaml
+*.password
+*.history
+lan-hosts.out
+lan-hosts.mappings.json
+lan-wol.devices.json
+lan-wol.history.json
+lan-scan.results.json

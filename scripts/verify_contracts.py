@@ -119,6 +119,12 @@ REQUIRED_PATHS = [
     "/api/alerts", "/api/auth", "/api/auth/password", "/api/auth/verify",
     "/api/records", "/api/probe", "/api/interfaces", "/api/health/targets",
     "/api/queries", "/api/browse", "/api/conflicts",
+    # M4 component endpoints (PRD 4.6 / 4.7)
+    "/api/hosts/mappings", "/api/hosts/mapping", "/api/hosts/remove",
+    "/api/hosts/import", "/api/hosts/render", "/api/hosts/publish",
+    "/api/hosts/status",
+    "/api/wol/devices", "/api/wol/device", "/api/wol/remove",
+    "/api/wol/wake", "/api/wol/probe", "/api/wol/status", "/api/wol/history",
 ]
 
 MANDATORY_METRICS = [
@@ -137,8 +143,9 @@ REGISTERED_KINDS = [
     "health_transition", "name_conflict", "config_invalid",
     "config_reload_failed", "gateway_target_unreachable",
     "relay_loop_detected", "relay_ttl_exceeded", "cert_expiring",
-    "cert_revoked", "scan_anomaly", "sync_conflict",
-    "device_wake_failed", "ssdp_discovery_error",
+    "cert_revoked", "cert_issued", "scan_anomaly", "sync_conflict",
+    "device_wake_failed", "wol_wake_sent", "ssdp_discovery_error",
+    "hosts_publish_failed", "hosts_conflict_detected",
 ]
 
 

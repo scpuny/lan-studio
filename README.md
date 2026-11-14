@@ -3,7 +3,7 @@
 > 内网轻量 ZeroConf 与局域网运维工具箱。
 > 8 个 `lan-*` 组件，统一契约、独立二进制、独立 WebUI、可单独部署。
 
-**当前状态：M3 完成（M2 `lan-mdns` 66/66 + 其余 P0 三组件）**（2026-11-13）。
+**当前状态：M4 完成（M2 `lan-mdns` 66/66 + 其余 P0 三组件 + P1 两组件）**（2026-11-14）。
 M2 管理台为 **Vue 3 + TypeScript + Arco Design** 六区域控制台，打包成单个自包含 HTML
 编入二进制；四道门禁全绿：Rust 单测 **81 项**、静态契约 **21 项**、运行态契约 **70 项**、
 冒烟 **229 项**，逐条销项见 [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md)。
@@ -12,6 +12,13 @@ M3 新增 `lan-relay` / `lan-ca` / `lan-scan` 三个独立二进制，以及共�
 `common/component`（统一契约端点 + 离线六区域控制台）。`lan-relay` 的环路检测 4 项
 硬性验收（指纹窗口 / 出入网卡隔离 / TTL 归零 / 自生成包）与 60 秒无广播风暴压力测试
 全部通过，逐条销项见 [`docs/M3-CHECKLIST.md`](docs/M3-CHECKLIST.md)。
+
+M4 新增 `lan-hosts` / `lan-wol` 两个独立二进制与共享 `common/probe`（只读 TCP 探测 +
+去抖状态机）。`lan-hosts` 只做静态名字映射的登记 / 渲染 / 原子发布，不实现组播应答、
+DNS 与 HTTP 代理；`lan-wol` 的唤醒目标必须来自已登记设备、广播发送默认关闭、状态探测
+连续去抖防误判。PRD §7.5 的「与 `lan-mdns` 无功能重叠、无强耦合」由 5 条自动断言验证，
+方案见 [`docs/M4-PLAN.md`](docs/M4-PLAN.md)，逐条销项见
+[`docs/M4-CHECKLIST.md`](docs/M4-CHECKLIST.md)。
 
 - 完整规格：[`docs/PRD.md`](docs/PRD.md)
 - 指标字典：[`docs/METRICS.md`](docs/METRICS.md)
@@ -22,11 +29,13 @@ M3 新增 `lan-relay` / `lan-ca` / `lan-scan` 三个独立二进制，以及共�
 
 ```
 lan-studio/
-├── Cargo.toml             # workspace，16 个 member
+├── Cargo.toml             # workspace，19 个 member
 ├── docs/                  # 规格与字典
 │   ├── PRD.md             # 唯一权威规格书
 │   ├── M2-CHECKLIST.md    # 66 条功能逐条销项基线
 │   ├── M3-CHECKLIST.md    # 其余 P0 三组件销项基线
+│   ├── M4-PLAN.md         # P1 两组件落地方案（决策清单 / 数据结构 / 分批）
+│   ├── M4-CHECKLIST.md    # P1 两组件销项基线
 │   ├── METRICS.md  ALERT-SCHEMA.md  ERROR-CODES.md
 │   └── ADR/               # 0001 M1 / 0002 M2.1 / 0003 M2.2 / 0004 M2.3 / 0005 M2.4 / 0006 契约门禁
 ├── contracts/             # 机器可读契约（语言无关）
@@ -38,17 +47,21 @@ lan-studio/
 │   ├── test_api_contract.py  # 运行态契约门禁（74 项，比对 openapi 与真实响应）
 │   ├── smoke_mdns.py         # 运行态冒烟（229 项断言）
 │   ├── test_m3.py           # M3 三组件统一契约 + 环路检测运行态验收
+│   ├── test_m4.py           # M4 两组件统一契约 + 无重叠/无耦合运行态验收
 │   └── install.sh          # 一键安装 / --upgrade（保留配置与凭据）
 ├── common/                # 公共 crate
 │   ├── config/  crypto/  alert/  dns/  net/  log/  health/
 │   ├── auth/  metrics/  webui/  api/
-│   └── component/         # M3 共享运行时：统一契约端点 + 离线控制台
+│   ├── component/         # M3 共享运行时：统一契约端点 + 离线控制台
+│   └── probe/             # M4 只读 TCP 探测 + 去抖状态机
 ├── components/
 │   ├── lan-mdns/          # 真实引擎 + 网关 + 配置模板
 │   │   └── webui/         # Vue 3 + TypeScript + Arco 控制台（构建产物编入二进制）
 │   ├── lan-relay/         # 跨网段 mDNS 中继 + 4 项环路检测
 │   ├── lan-ca/            # 内网轻量证书签发 / 续期 / 吊销 / 审计
-│   └── lan-scan/          # 只读资产与端口探查（速率 / 并发有硬上界）
+│   ├── lan-scan/          # 只读资产与端口探查（速率 / 并发有硬上界）
+│   ├── lan-hosts/         # 静态名字映射登记 / 渲染 / 原子发布（不做 DNS）
+│   └── lan-wol/           # 已登记设备网络唤醒 / 去抖状态探测 / 唤醒审计
 ├── deploy/
 │   ├── Dockerfile  docker-compose.yml  lan-mdns.service
 ├── shell/                 # 统一出口（M5）
@@ -224,7 +237,7 @@ python3 scripts/test_api_contract.py
 | M1 | monorepo 骨架、`common-*` 最小集、CI、单文件产物 | **完成** |
 | M2 | `lan-mdns` 功能全集 66 条逐条销项 | **完成（66/66）** |
 | M3 | 其余 P0：`lan-relay` / `lan-ca` / `lan-scan` | **完成（环路检测 4/4）** |
-| M4 | P1：`lan-hosts` / `lan-wol` | 待启动 |
+| M4 | P1：`lan-hosts` / `lan-wol` | **完成（无重叠 5/5）** |
 | M5 | P2：`lan-sync` / `lan-ssdp` + 统一出口 + 生态 DoD | 待启动 |
 
 ## 说明
@@ -239,5 +252,10 @@ python3 scripts/test_api_contract.py
   三组件默认端口 8081 / 8082 / 8083，与 `lan-mdns` 的 8080 不冲突。
 - M3 的 `lan-ca` 采用**单根自签 HMAC 凭证**（非 X.509 公钥证书、不接入浏览器 TLS
   信任链），以保持 workspace 零第三方 crypto crate；边界详见组件 README。
+- M4 两组件默认端口 8084 / 8085，沿用 `common-component` 的统一契约与离线六区域控制台；
+  业务数据各写自身 JSON lines 文件，不进配置快照。
+- M4 的 `lan-hosts` 拒绝 `.local` 映射（归 `lan-mdns`），`lan-wol` 的 `send_enabled`
+  默认关闭，需显式开启并向已登记设备发送唤醒包；两者互不依赖、也不依赖 `lan-mdns` /
+  `lan-scan`。
 - `LAN_MDNS_GROUP` / `LAN_MDNS_PORT` / `LAN_MDNS_GATEWAY_PORT` 仅用于测试隔离；
   生产组播地址、mDNS 端口与网关端口永远取自 YAML。

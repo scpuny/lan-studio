@@ -1,0 +1,37 @@
+version: 1
+component: lan-hosts
+
+server:
+  listen: "127.0.0.1"
+  port: 8084
+  webui: true
+  admin_token: ""
+  log_level: info
+
+observability:
+  metrics: true
+  alerts: true
+  history_limit: 30
+
+logging:
+  max_bytes: 1048576
+  backup_count: 3
+  level: info
+
+alerts:
+  enabled: true
+  webhooks: []
+  cooldown_seconds: 300
+  timeout_seconds: 5.0
+  max_retries: 2
+
+# --- lan-hosts business configuration (PRD 4.6: static mappings, no mDNS) ---
+hosts:
+  # `.local` belongs to lan-mdns; rejecting it keeps the two components disjoint.
+  allow_local_suffix: false
+  conflict_policy: reject
+  mappings_path: "lan-hosts.mappings.json"
+  output_path: "lan-hosts.out"
+  max_mappings: 2000
+  publish_enabled: false
+  include_header: true
