@@ -3,12 +3,15 @@
 > 内网轻量 ZeroConf 与局域网运维工具箱。
 > 8 个 `lan-*` 组件，统一契约、独立二进制、独立 WebUI、可单独部署。
 
-**当前状态：M2 完成（`lan-mdns` 66/66）**（2026-11-13）。管理台已从占位页替换为
-**Vue 3 + TypeScript + Arco Design** 的六区域控制台（状态总览 / 配置管理 / 可观测 /
-日志 / 告警设置 / 版本历史），打包成单个自包含 HTML 编入二进制；同时销项多网卡绑定、
-健康状态灯、在线配置表单与源码双模式、服务导航、API 契约运行态测试。四道门禁全绿：
-Rust 单测 **81 项**、静态契约 **21 项**、运行态契约 **70 项**、冒烟 **229 项**。
-逐条销项见 [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md)。
+**当前状态：M3 完成（M2 `lan-mdns` 66/66 + 其余 P0 三组件）**（2026-11-13）。
+M2 管理台为 **Vue 3 + TypeScript + Arco Design** 六区域控制台，打包成单个自包含 HTML
+编入二进制；四道门禁全绿：Rust 单测 **81 项**、静态契约 **21 项**、运行态契约 **70 项**、
+冒烟 **229 项**，逐条销项见 [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md)。
+
+M3 新增 `lan-relay` / `lan-ca` / `lan-scan` 三个独立二进制，以及共享运行时
+`common/component`（统一契约端点 + 离线六区域控制台）。`lan-relay` 的环路检测 4 项
+硬性验收（指纹窗口 / 出入网卡隔离 / TTL 归零 / 自生成包）与 60 秒无广播风暴压力测试
+全部通过，逐条销项见 [`docs/M3-CHECKLIST.md`](docs/M3-CHECKLIST.md)。
 
 - 完整规格：[`docs/PRD.md`](docs/PRD.md)
 - 指标字典：[`docs/METRICS.md`](docs/METRICS.md)
@@ -19,10 +22,11 @@ Rust 单测 **81 项**、静态契约 **21 项**、运行态契约 **70 项**、
 
 ```
 lan-studio/
-├── Cargo.toml             # workspace，12 个 member
+├── Cargo.toml             # workspace，16 个 member
 ├── docs/                  # 规格与字典
 │   ├── PRD.md             # 唯一权威规格书
 │   ├── M2-CHECKLIST.md    # 66 条功能逐条销项基线
+│   ├── M3-CHECKLIST.md    # 其余 P0 三组件销项基线
 │   ├── METRICS.md  ALERT-SCHEMA.md  ERROR-CODES.md
 │   └── ADR/               # 0001 M1 / 0002 M2.1 / 0003 M2.2 / 0004 M2.3 / 0005 M2.4 / 0006 契约门禁
 ├── contracts/             # 机器可读契约（语言无关）
@@ -33,13 +37,18 @@ lan-studio/
 │   ├── verify_contracts.py   # 静态契约校验（文档彼此自洽）
 │   ├── test_api_contract.py  # 运行态契约门禁（74 项，比对 openapi 与真实响应）
 │   ├── smoke_mdns.py         # 运行态冒烟（229 项断言）
+│   ├── test_m3.py           # M3 三组件统一契约 + 环路检测运行态验收
 │   └── install.sh          # 一键安装 / --upgrade（保留配置与凭据）
 ├── common/                # 公共 crate
 │   ├── config/  crypto/  alert/  dns/  net/  log/  health/
-│   └── auth/  metrics/  webui/  api/
+│   ├── auth/  metrics/  webui/  api/
+│   └── component/         # M3 共享运行时：统一契约端点 + 离线控制台
 ├── components/
-│   └── lan-mdns/          # 真实引擎 + 网关 + 配置模板
-│       └── webui/         # Vue 3 + TypeScript + Arco 控制台（构建产物编入二进制）
+│   ├── lan-mdns/          # 真实引擎 + 网关 + 配置模板
+│   │   └── webui/         # Vue 3 + TypeScript + Arco 控制台（构建产物编入二进制）
+│   ├── lan-relay/         # 跨网段 mDNS 中继 + 4 项环路检测
+│   ├── lan-ca/            # 内网轻量证书签发 / 续期 / 吊销 / 审计
+│   └── lan-scan/          # 只读资产与端口探查（速率 / 并发有硬上界）
 ├── deploy/
 │   ├── Dockerfile  docker-compose.yml  lan-mdns.service
 ├── shell/                 # 统一出口（M5）
@@ -214,7 +223,7 @@ python3 scripts/test_api_contract.py
 | M0 | 契约冻结（本目录全部内容） | **完成** |
 | M1 | monorepo 骨架、`common-*` 最小集、CI、单文件产物 | **完成** |
 | M2 | `lan-mdns` 功能全集 66 条逐条销项 | **完成（66/66）** |
-| M3 | 其余 P0：`lan-relay` / `lan-ca` / `lan-scan` | 待启动 |
+| M3 | 其余 P0：`lan-relay` / `lan-ca` / `lan-scan` | **完成（环路检测 4/4）** |
 | M4 | P1：`lan-hosts` / `lan-wol` | 待启动 |
 | M5 | P2：`lan-sync` / `lan-ssdp` + 统一出口 + 生态 DoD | 待启动 |
 
@@ -225,5 +234,10 @@ python3 scripts/test_api_contract.py
 - 既有 mDNS 服务已进入维护阶段（仅修缺陷、不接新需求），其功能由 `lan-mdns` 承接。
 - M2 已完成：66/66 销项，PRD 8.1 的 8 项组件级 DoD 逐条核对通过
   （见 [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md) 第 8 节）。
+- M3 已完成：三组件共用 `common-component` 契约运行时；`lan-relay` 环路检测 4 项
+  硬性验收与 60 秒压力测试通过（见 [`docs/M3-CHECKLIST.md`](docs/M3-CHECKLIST.md)）。
+  三组件默认端口 8081 / 8082 / 8083，与 `lan-mdns` 的 8080 不冲突。
+- M3 的 `lan-ca` 采用**单根自签 HMAC 凭证**（非 X.509 公钥证书、不接入浏览器 TLS
+  信任链），以保持 workspace 零第三方 crypto crate；边界详见组件 README。
 - `LAN_MDNS_GROUP` / `LAN_MDNS_PORT` / `LAN_MDNS_GATEWAY_PORT` 仅用于测试隔离；
   生产组播地址、mDNS 端口与网关端口永远取自 YAML。

@@ -1,6 +1,7 @@
 <template>
   <div class="ls-panel">
     <div class="ls-panel-title">
+      <Icon name="radar" />
       可观测
       <span class="ls-hint">服务地图与审计队列按 TTL 自动老化</span>
       <div class="ls-header-spacer"></div>
@@ -8,7 +9,8 @@
     </div>
 
     <a-tabs v-model:active-key="tab" type="card-gutter" :destroy-on-hide="false">
-      <a-tab-pane key="map" title="服务地图">
+      <a-tab-pane key="map">
+        <template #title><Icon name="globe" :size="14" /> 服务地图</template>
         <div class="ls-grid" style="margin-bottom: 14px">
           <div class="ls-metric-card">
             <div class="ls-kpi-label">服务类型</div>
@@ -46,7 +48,8 @@
         </div>
       </a-tab-pane>
 
-      <a-tab-pane key="queries" title="查询审计">
+      <a-tab-pane key="queries">
+        <template #title><Icon name="search" :size="14" /> 查询审计</template>
         <div class="ls-row" style="margin-bottom: 10px">
           <span class="ls-note">最近 {{ queries.length }} 条查询，环形缓冲有界，不落盘。</span>
           <div class="ls-header-spacer"></div>
@@ -68,7 +71,8 @@
         </a-table>
       </a-tab-pane>
 
-      <a-tab-pane key="conflicts" title="名称冲突">
+      <a-tab-pane key="conflicts">
+        <template #title><Icon name="alert" :size="14" /> 名称冲突</template>
         <a-alert v-if="conflicts.length > 0" type="warning" style="margin-bottom: 12px">
           检测到同名记录出现不同值，可能存在名称冲突或非法宣告。
         </a-alert>
@@ -91,7 +95,8 @@
         </a-table>
       </a-tab-pane>
 
-      <a-tab-pane key="records" title="资源记录">
+      <a-tab-pane key="records">
+        <template #title><Icon name="layers" :size="14" /> 资源记录</template>
         <div class="ls-row" style="margin-bottom: 10px">
           <a-input v-model="recordFilter" placeholder="按名称前缀过滤" allow-clear style="width: 260px" />
           <span class="ls-note">共 {{ records.length }} 条，本进程发布。</span>
@@ -109,7 +114,8 @@
         </a-table>
       </a-tab-pane>
 
-      <a-tab-pane key="metrics" title="指标">
+      <a-tab-pane key="metrics">
+        <template #title><Icon name="chart" :size="14" /> 指标</template>
         <div class="ls-row" style="margin-bottom: 10px">
           <span class="ls-note">
             Prometheus 文本格式（<code>0.0.4</code>），前缀 <code>lanstudio_mdns_*</code>。
@@ -128,6 +134,7 @@ import { computed, ref, watch } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import type { TableColumnData } from '@arco-design/web-vue'
 import { errorMessage, get, getText } from '../api'
+import Icon from '../Icon.vue'
 import { formatTime, usePolling } from '../poll'
 import type {
   BrowseData,

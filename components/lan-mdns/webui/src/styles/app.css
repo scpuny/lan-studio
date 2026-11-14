@@ -1,101 +1,109 @@
 /* ============================================================
-   Lan Studio — 布局方案取自旧工程 mdns-responder/admin.html
-   浮动玻璃侧栏 + 顶栏标题 + 双层质感卡片 + aurora 背景
-   设计令牌双主题（跟随 Arco 的 arco-theme 切换）
+   Lan Studio — Calm Console
+   设计取向：克制、专业、信息密度高的运维控制台。
+   固定实色侧栏 + 1px 细边框 + 单一沉稳主色，去除玻璃拟态 / 光晕 /
+   浮动圆角侧栏。深浅双主题跟随 Arco 的 arco-theme 切换。
+   所有类名沿用旧工程，仅重定义视觉层，页面模板不改动。
    ============================================================ */
 :root {
   /* 表面与文字 */
-  --ls-bg: #f2f4f9;
-  --ls-bg-soft: #e8ecf4;
-  --ls-shell: rgba(255, 255, 255, 0.62);
-  --ls-core: #ffffff;
-  --ls-ink: #101828;
-  --ls-ink-2: #5b6679;
-  --ls-ink-3: #98a2b3;
-  --ls-line: rgba(16, 24, 40, 0.09);
-  --ls-line-soft: rgba(16, 24, 40, 0.045);
+  --ls-bg: #f5f6f8;
+  --ls-surface: #ffffff;
+  --ls-rail: #ffffff;
+  --ls-ink: #1d2430;
+  --ls-ink-2: #5a6473;
+  --ls-ink-3: #8b94a3;
+  --ls-line: #e7e9ee;
+  --ls-line-soft: #eef0f4;
 
-  /* 品牌：靛蓝 + 青 */
-  --ls-accent: #4f46e5;
-  --ls-accent-2: #0891b2;
-  --ls-accent-soft: rgba(79, 70, 229, 0.09);
+  /* 品牌：沉稳靛蓝（单一主色，克制） */
+  --ls-accent: #3b5bdb;
+  --ls-accent-2: #4263eb;
+  --ls-accent-soft: rgba(59, 91, 219, 0.1);
 
   /* 状态色 */
-  --ls-up: #059669;
-  --ls-down: #dc2626;
-  --ls-warn: #d97706;
-  --ls-unknown: #98a2b3;
-  --ls-info: #2563eb;
+  --ls-up: #2b8a3e;
+  --ls-down: #e03131;
+  --ls-warn: #e8920c;
+  --ls-unknown: #868e96;
+  --ls-info: #1c7ed6;
 
-  /* 阴影与光晕 */
-  --ls-shadow: 0 28px 70px -38px rgba(16, 24, 40, 0.34);
-  --ls-shadow-soft: 0 12px 32px -22px rgba(16, 24, 40, 0.3);
-  --ls-aurora-1: rgba(99, 102, 241, 0.16);
-  --ls-aurora-2: rgba(6, 182, 212, 0.12);
-  --ls-grid-line: rgba(16, 24, 40, 0.03);
-  --ls-tile: rgba(16, 24, 40, 0.032);
-  --ls-tile-hover: rgba(79, 70, 229, 0.07);
+  /* 阴影与层级（极轻，靠边框分层） */
+  --ls-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 6px rgba(16, 24, 40, 0.05);
+  --ls-shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.03);
+
+  /* 瓦片（指标卡 / 服务分组底） */
+  --ls-tile: #f7f8fa;
+  --ls-tile-hover: #eef1f8;
+
+  /* 表单字段：白底 + 明确边框。在灰底分组卡上形成反差，在白底面板上靠边框区分 */
+  --ls-field-bg: #ffffff;
+  --ls-field-bg-focus: #ffffff;
+  --ls-field-border: #d8dce4;
+  /* 分组卡底：比白面板更深一档的灰，让卡片作为容器清晰可辨 */
+  --ls-group-bg: #f3f5f9;
 
   --ls-gap: 16px;
   --ls-gap-sm: 10px;
-  --ls-radius: 18px;
-  --ls-radius-sm: 12px;
-  --ls-font: "Plus Jakarta Sans", "Segoe UI Variable Display", -apple-system,
-    BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+  --ls-radius: 10px;
+  --ls-radius-sm: 8px;
+  --ls-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC",
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   --ls-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
 }
 
 [arco-theme="dark"] {
-  --ls-bg: #06080e;
-  --ls-bg-soft: #0a0e18;
-  --ls-shell: rgba(255, 255, 255, 0.045);
-  --ls-core: rgba(17, 22, 34, 0.88);
-  --ls-ink: #eef2ff;
-  --ls-ink-2: #98a3b8;
-  --ls-ink-3: #5d6a82;
+  --ls-bg: #0e1014;
+  --ls-surface: #161a21;
+  --ls-rail: #12151b;
+  --ls-ink: #e7eaf0;
+  --ls-ink-2: #a6afbe;
+  --ls-ink-3: #6c7585;
   --ls-line: rgba(255, 255, 255, 0.09);
-  --ls-line-soft: rgba(255, 255, 255, 0.045);
+  --ls-line-soft: rgba(255, 255, 255, 0.05);
 
-  --ls-accent: #818cf8;
-  --ls-accent-2: #22d3ee;
-  --ls-accent-soft: rgba(129, 140, 248, 0.12);
+  --ls-accent: #5c7cfa;
+  --ls-accent-2: #748ffc;
+  --ls-accent-soft: rgba(92, 124, 250, 0.14);
 
-  --ls-up: #34d399;
-  --ls-down: #f87171;
-  --ls-warn: #fbbf24;
-  --ls-unknown: #5d6a82;
-  --ls-info: #60a5fa;
+  --ls-up: #40c057;
+  --ls-down: #ff6b6b;
+  --ls-warn: #ffa94d;
+  --ls-unknown: #6c7585;
+  --ls-info: #4dabf7;
 
-  --ls-shadow: 0 32px 90px -46px rgba(0, 0, 0, 0.95);
-  --ls-shadow-soft: 0 14px 40px -28px rgba(0, 0, 0, 0.8);
-  --ls-aurora-1: rgba(99, 102, 241, 0.24);
-  --ls-aurora-2: rgba(34, 211, 238, 0.14);
-  --ls-grid-line: rgba(255, 255, 255, 0.022);
-  --ls-tile: rgba(255, 255, 255, 0.055);
-  --ls-tile-hover: rgba(129, 140, 248, 0.14);
+  --ls-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ls-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  --ls-tile: rgba(255, 255, 255, 0.035);
+  --ls-tile-hover: rgba(92, 124, 250, 0.1);
+
+  --ls-field-bg: rgba(255, 255, 255, 0.07);
+  --ls-field-bg-focus: rgba(255, 255, 255, 0.1);
+  --ls-field-border: rgba(255, 255, 255, 0.15);
+  --ls-group-bg: rgba(255, 255, 255, 0.04);
 }
 
 /* ============================================================
    Arco 主色覆盖（靛蓝），让内部控件与外壳统一调性
    ============================================================ */
 :root {
-  --primary-1: 237 238 252;
+  --primary-1: 235 238 252;
   --primary-2: 221 223 248;
   --primary-3: 193 197 242;
   --primary-4: 156 162 233;
   --primary-5: 123 131 224;
-  --primary-6: 79 70 229;
-  --primary-7: 67 60 202;
-  --primary-8: 56 50 176;
-  --primary-9: 46 42 150;
-  --primary-10: 37 33 124;
+  --primary-6: 59 91 219;
+  --primary-7: 53 81 197;
+  --primary-8: 47 72 176;
+  --primary-9: 41 63 150;
+  --primary-10: 35 54 124;
 }
 [arco-theme="dark"] {
-  --primary-6: 129 140 248;
-  --primary-5: 145 152 244;
-  --primary-7: 110 120 240;
+  --primary-6: 92 124 250;
+  --primary-5: 110 139 252;
+  --primary-7: 76 108 246;
 }
 
 * {
@@ -113,7 +121,6 @@ body {
   font-size: 14px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 #app {
@@ -130,148 +137,105 @@ body {
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ls-ink-3);
+  background-clip: padding-box;
+}
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* 背景层 */
-.ls-aurora {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-.ls-aurora::before,
-.ls-aurora::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-}
-.ls-aurora::before {
-  width: 760px;
-  height: 760px;
-  top: -320px;
-  left: -160px;
-  background: var(--ls-aurora-1);
-}
-.ls-aurora::after {
-  width: 660px;
-  height: 660px;
-  bottom: -360px;
-  right: -140px;
-  background: var(--ls-aurora-2);
-}
-.ls-grain {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.5;
-  background-image: linear-gradient(var(--ls-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ls-grid-line) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse at 40% 20%, #000 10%, transparent 78%);
-  mask-image: radial-gradient(ellipse at 40% 20%, #000 10%, transparent 78%);
-}
-
 .ls-app {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   min-height: 100vh;
+  font-size: 14px;
 }
 
 /* ============================================================
-   浮动玻璃侧栏
+   固定实色侧栏（不再悬浮毛玻璃）
    ============================================================ */
 .ls-rail {
   position: fixed;
   z-index: 20;
-  left: 22px;
-  top: 22px;
-  bottom: 22px;
-  width: 236px;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 240px;
   display: flex;
   flex-direction: column;
-  padding: 20px 14px 16px;
-  border-radius: 30px;
-  border: 1px solid var(--ls-line);
-  background: var(--ls-shell);
-  backdrop-filter: blur(26px) saturate(150%);
-  -webkit-backdrop-filter: blur(26px) saturate(150%);
-  box-shadow: var(--ls-shadow);
+  padding: 22px 14px;
+  background: var(--ls-rail);
+  border-right: 1px solid var(--ls-line);
 }
 
 .ls-brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 10px 26px;
+  padding: 4px 10px 22px;
 }
 .ls-brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 13px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: grid;
   place-items: center;
   color: #fff;
   background: linear-gradient(140deg, var(--ls-accent), var(--ls-accent-2));
-  box-shadow: 0 8px 22px -8px var(--ls-accent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  flex: none;
 }
 .ls-brand-mark svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
 }
 .ls-brand-name {
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: 1.15;
 }
 .ls-brand-sub {
   font-size: 9.5px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ls-ink-3);
   font-weight: 600;
 }
 
 .ls-nav-label {
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
+  font-size: 10px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ls-ink-3);
-  padding: 0 12px 10px;
+  padding: 0 12px 8px;
   font-weight: 700;
 }
 .ls-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .ls-nav-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 13px;
-  border-radius: 15px;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: 8px;
   color: var(--ls-ink-2);
   font-weight: 600;
-  font-size: 13px;
+  font-size: 13.5px;
   text-align: left;
   width: 100%;
   border: 0;
   background: none;
   cursor: pointer;
-  transition: background 0.45s cubic-bezier(0.32, 0.72, 0, 1),
-    color 0.45s cubic-bezier(0.32, 0.72, 0, 1),
-    transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .ls-nav-item svg {
   flex: none;
-  opacity: 0.8;
+  opacity: 0.85;
   stroke: currentColor;
 }
 .ls-nav-ico {
@@ -280,27 +244,26 @@ body {
 .ls-nav-item:hover {
   background: var(--ls-line-soft);
   color: var(--ls-ink);
-  transform: translateX(2px);
 }
 .ls-nav-item.on {
   background: var(--ls-accent-soft);
   color: var(--ls-accent);
+  font-weight: 700;
 }
 .ls-nav-item.on::before {
   content: "";
   position: absolute;
   left: -14px;
-  top: 22%;
-  height: 56%;
+  top: 18%;
+  height: 64%;
   width: 3px;
   border-radius: 99px;
-  background: linear-gradient(var(--ls-accent), var(--ls-accent-2));
-  box-shadow: 0 0 14px var(--ls-accent);
+  background: var(--ls-accent);
 }
 
 .ls-rail-foot {
   margin-top: auto;
-  padding: 14px 10px 4px;
+  padding: 14px 10px 2px;
   border-top: 1px solid var(--ls-line-soft);
 }
 .ls-rail-stat {
@@ -309,7 +272,7 @@ body {
   justify-content: space-between;
   font-size: 11px;
   color: var(--ls-ink-3);
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 .ls-rail-stat b {
   color: var(--ls-ink-2);
@@ -321,9 +284,9 @@ body {
    ============================================================ */
 .ls-main {
   position: relative;
-  z-index: 2;
-  margin-left: 282px;
-  padding: 30px 40px 72px;
+  z-index: 1;
+  margin-left: 240px;
+  padding: 28px 36px 64px;
   max-width: 1680px;
 }
 .ls-topbar {
@@ -332,22 +295,22 @@ body {
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
-  margin-bottom: 26px;
+  margin-bottom: 22px;
 }
 .ls-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 12px;
+  padding: 4px 11px;
   border-radius: 99px;
   border: 1px solid var(--ls-line);
-  background: var(--ls-shell);
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
+  background: transparent;
+  font-size: 10px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   font-weight: 700;
   color: var(--ls-ink-3);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .ls-eyebrow-dot {
   width: 5px;
@@ -356,11 +319,11 @@ body {
   background: var(--ls-accent);
 }
 .ls-page-title {
-  font-size: clamp(28px, 3.2vw, 40px);
-  line-height: 1.08;
-  letter-spacing: -0.045em;
+  font-size: 23px;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
   font-weight: 700;
-  margin: 0 0 7px;
+  margin: 0 0 6px;
 }
 .ls-page-sub {
   color: var(--ls-ink-2);
@@ -370,57 +333,53 @@ body {
 .ls-top-actions {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .ls-status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 15px;
+  gap: 8px;
+  padding: 7px 13px;
   border-radius: 99px;
   border: 1px solid var(--ls-line);
-  background: var(--ls-shell);
+  background: var(--ls-surface);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 .ls-icon-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: grid;
   place-items: center;
   color: var(--ls-ink-2);
   border: 1px solid var(--ls-line);
-  background: var(--ls-shell);
+  background: var(--ls-surface);
   cursor: pointer;
-  transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    color 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-    background 0.6s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 .ls-icon-btn svg {
   stroke: currentColor;
 }
 .ls-icon-btn:hover {
-  transform: rotate(12deg);
   color: var(--ls-accent);
+  border-color: var(--ls-accent);
   background: var(--ls-accent-soft);
 }
 .ls-view {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 /* ============================================================
-   卡片（双层质感：外壳 + 内核）
+   面板（白底 + 1px 边框，轻阴影）
    ============================================================ */
 .ls-panel {
-  border: none;
+  border: 1px solid var(--ls-line);
   border-radius: var(--ls-radius);
-  background: var(--ls-core);
-  padding: 30px 34px;
+  background: var(--ls-surface);
+  padding: 22px 26px;
   box-shadow: var(--ls-shadow-soft);
 }
 .ls-panel + .ls-panel {
@@ -432,8 +391,8 @@ body {
   gap: 8px;
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.015em;
-  margin-bottom: 18px;
+  letter-spacing: -0.01em;
+  margin-bottom: 16px;
   color: var(--ls-ink);
 }
 .ls-panel-title .ls-hint {
@@ -446,14 +405,13 @@ body {
 }
 
 /* ============================================================
-   KPI / 指标
+   网格 + 指标卡
    ============================================================ */
 .ls-grid {
   display: grid;
   gap: var(--ls-gap-sm) var(--ls-gap);
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
-/* 指标小卡片矩阵：运行状态 6 项一行、协议计数 4 列，窄屏逐级折叠 */
 .ls-grid--status {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
@@ -479,47 +437,74 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* 指标小卡片：面板内的统一凹底瓦片，规整对齐 */
+
+/* 告警页指标卡：按卡片数量定宽列，始终撑满整行（避免 auto-fill 留右侧空轨） */
+.ls-grid--alerts {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.ls-grid--gw {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .ls-grid--alerts,
+  .ls-grid--gw {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .ls-grid--alerts,
+  .ls-grid--gw {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* 指标卡：大图标在左（圆形描边、彩色），文字两行在右并右对齐
+   参考版式：彩色圆形图标 + 右侧 label/value 两行；左侧 3px 色条承担色彩区分 */
 .ls-metric-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   background: var(--ls-tile);
-  border: 1px solid var(--ls-line-soft);
+  border: 1px solid var(--ls-line);
   border-radius: var(--ls-radius-sm);
   padding: 14px 16px;
   min-width: 0;
-  transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    transform 0.18s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .ls-metric-card:hover {
   background: var(--ls-tile-hover);
   border-color: var(--ls-accent-soft);
-  transform: translateY(-1px);
 }
-.ls-metric-card .ls-inline {
-  align-items: flex-start;
-  gap: 10px;
-}
-.ls-metric-card .ls-inline .ls-dot {
-  margin-top: 5px;
-  flex: none;
+.ls-metric-body {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
 }
 .ls-metric-card .ls-kpi-label {
-  margin-bottom: 6px;
+  margin-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ls-metric-card .ls-kpi-value {
+  line-height: 1.1;
 }
 .ls-metric-card .ls-kpi-value.small {
   font-size: 14px;
 }
 .ls-kpi-label {
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ls-ink-3);
   font-weight: 700;
   margin-bottom: 8px;
 }
 .ls-kpi-value {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -551,17 +536,17 @@ body {
 }
 .ls-dot.is-up {
   background: var(--ls-up);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ls-up) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ls-up) 16%, transparent);
   animation: ls-breathe 2.4s ease-in-out infinite;
 }
 .ls-dot.is-down {
   background: var(--ls-down);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ls-down) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ls-down) 16%, transparent);
   animation: ls-breathe-fast 1.8s ease-in-out infinite;
 }
 .ls-dot.is-warn {
   background: var(--ls-warn);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ls-warn) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ls-warn) 16%, transparent);
 }
 .ls-dot.is-unknown {
   background: var(--ls-unknown);
@@ -572,7 +557,7 @@ body {
     opacity: 1;
   }
   50% {
-    opacity: 0.45;
+    opacity: 0.5;
   }
 }
 @keyframes ls-breathe-fast {
@@ -581,7 +566,7 @@ body {
     opacity: 1;
   }
   50% {
-    opacity: 0.4;
+    opacity: 0.45;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -615,8 +600,8 @@ body {
 .ls-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 22px;
+  gap: 7px;
+  margin-bottom: 20px;
 }
 .ls-field > label {
   font-size: 13px;
@@ -629,15 +614,15 @@ body {
 .ls-field-grid {
   display: grid;
   gap: 8px var(--ls-gap);
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 .ls-code {
   width: 100%;
   min-height: 420px;
   padding: 12px;
   border-radius: var(--ls-radius-sm);
-  border: 1px solid var(--ls-line);
-  background: var(--ls-bg-soft);
+  border: 1px solid var(--ls-field-border);
+  background: var(--ls-surface);
   color: var(--ls-ink);
   font-family: var(--ls-mono);
   font-size: 12.5px;
@@ -654,7 +639,7 @@ body {
   overflow: auto;
   border: 1px solid var(--ls-line);
   border-radius: var(--ls-radius-sm);
-  background: var(--ls-bg-soft);
+  background: var(--ls-tile);
   padding: 10px 12px;
   font-family: var(--ls-mono);
   font-size: 12px;
@@ -689,7 +674,7 @@ body {
   color: var(--ls-unknown);
 }
 .ls-empty {
-  padding: 28px 0;
+  padding: 24px 0;
 }
 .ls-note {
   font-size: 12.5px;
@@ -730,8 +715,8 @@ body {
    ============================================================ */
 .arco-table th {
   background: transparent !important;
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ls-ink-3);
   font-weight: 700;
@@ -746,9 +731,36 @@ body {
 .arco-tabs-nav::before {
   background: var(--ls-line-soft) !important;
 }
-.arco-input-wrapper,
-.arco-select-view {
-  background: var(--ls-bg-soft) !important;
+/* 表单控件：在白底面板上给出清晰的“字段”观感
+   浅灰填充 + 1px 边框，悬停加深边框，聚焦切换白底 + 主色描边，
+   不再依赖 Arco 默认浅灰边框（白底白面板时会隐形）。 */
+.ls-app .arco-input-wrapper,
+.ls-app .arco-select-view,
+.ls-app .arco-input-number,
+.ls-app .arco-input-password {
+  background-color: var(--ls-field-bg) !important;
+  border: 1px solid var(--ls-field-border) !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ls-app .arco-input-wrapper:hover,
+.ls-app .arco-select-view:hover,
+.ls-app .arco-input-number:hover,
+.ls-app .arco-input-password:hover {
+  border-color: var(--ls-ink-3) !important;
+}
+.ls-app .arco-input-wrapper:focus-within,
+.ls-app .arco-select-view:focus-within,
+.ls-app .arco-input-number:focus-within,
+.ls-app .arco-input-password:focus-within {
+  background-color: var(--ls-field-bg-focus) !important;
+  border-color: var(--ls-accent) !important;
+  box-shadow: 0 0 0 3px var(--ls-accent-soft);
+}
+/* 内嵌的纯文本输入去掉自带的浅底，统一交给外层 wrapper */
+.ls-app .arco-input,
+.ls-app .arco-input-number-step,
+.ls-app .arco-select-view .arco-select-view-value {
+  background: transparent !important;
 }
 .arco-btn-primary {
   background: linear-gradient(135deg, var(--ls-accent), var(--ls-accent-2)) !important;
@@ -767,12 +779,13 @@ body {
     top: auto;
     bottom: auto;
     width: auto;
-    margin: 16px 16px 0;
-    padding: 14px;
-    border-radius: 24px;
+    margin: 0;
+    padding: 16px 14px;
+    border-right: none;
+    border-bottom: 1px solid var(--ls-line);
   }
   .ls-brand {
-    padding: 2px 6px 12px;
+    padding: 2px 6px 14px;
   }
   .ls-nav-label,
   .ls-rail-foot {
@@ -781,66 +794,55 @@ body {
   .ls-nav {
     flex-direction: row;
     overflow-x: auto;
-    gap: 6px;
+    gap: 4px;
   }
   .ls-nav-item {
     width: auto;
     white-space: nowrap;
-    padding: 9px 13px;
+    padding: 8px 12px;
   }
   .ls-nav-item.on::before {
     display: none;
   }
   .ls-main {
     margin-left: 0;
-    padding: 24px 16px 56px;
+    padding: 22px 16px 52px;
   }
   .ls-page-title {
-    font-size: 28px;
+    font-size: 21px;
   }
 }
 
 /* ============================================================
-   大气化覆盖：把 Arco 控件整体放大一档
-   Arco 的 large 档对 switch/btn/字号只是微调（input 仅 +4px），
-   肉眼难辨，故在这里用确定性 CSS 直接覆盖关键盒子，深浅主题通用。
-   作用域 .ls-app，不影响全局；表格行内 mini 按钮保持紧凑不动。
+   控件尺寸：克制的放大（比 Arco 默认更舒展，但不夸张）
+   作用域 .ls-app，不影响全局；表格行内 mini 按钮保持紧凑。
    ============================================================ */
-.ls-app {
-  font-size: 15px;
-}
-
-/* 输入 / 数字 / 下拉：统一 42px，比 Arco large(34/36) 更舒展 */
+/* 输入 / 数字 / 下拉：统一 38px */
 .ls-app .arco-input,
 .ls-app .arco-input-wrapper,
 .ls-app .arco-select-view {
-  height: 42px;
-  font-size: 15px;
+  height: 38px;
+  font-size: 14px;
 }
 .ls-app .arco-input {
-  padding: 8px 14px;
+  padding: 8px 12px;
 }
 .ls-app .arco-select-view {
-  padding: 0 14px;
+  padding: 0 12px;
 }
 .ls-app .arco-textarea {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.7;
 }
 
-/* 主/次按钮放大到 40px（排除 mini，表格行内密集操作仍紧凑） */
+/* 主/次按钮：36px（排除 mini，表格行内密集操作仍紧凑） */
 .ls-app .arco-btn:not(.arco-btn-size-mini) {
-  min-height: 40px;
-  font-size: 15px;
-  padding: 0 18px;
+  min-height: 36px;
+  font-size: 14px;
+  padding: 0 16px;
 }
 
-/* 开关：等比放大，避免滑块绝对定位错位 */
-.ls-app .arco-switch {
-  zoom: 1.28;
-}
-/* .ls-field 是纵向 flex（align-items: stretch）会把开关拉满整列宽度，
-   必须收回到自然宽度，否则开关会宽到占满一列 */
+/* 开关：默认尺寸即可，避免滑块拉伸；flex 列里收回自然宽度 */
 .ls-app .ls-field .arco-switch,
 .ls-app .ls-inline .arco-switch {
   align-self: flex-start;
@@ -849,24 +851,24 @@ body {
 /* 配置页子标签（card-gutter）放大，与整体节奏一致 */
 .ls-app .arco-tabs-type-card-gutter .arco-tabs-tab,
 .ls-app .arco-tabs-card .arco-tabs-tab {
-  font-size: 14.5px;
-  padding: 8px 18px;
+  font-size: 14px;
+  padding: 7px 16px;
 }
 
-/* card-gutter 内容区自带左右 1px 边（gutter 视觉），去掉以保持无边框干净观感 */
+/* card-gutter 内容区自带 1px 边框（Arco 默认 border + border-top:none），
+   整框去掉保持干净观感，避免卡片下方多出一条横线 */
 .ls-app .arco-tabs-type-card-gutter .arco-tabs-content {
-  border-left: none;
-  border-right: none;
+  border: none;
+  padding-top: 14px;
 }
 
 /* 表格行高放宽，配合放大后的输入框 */
 .ls-app .arco-table-tr {
-  min-height: 50px;
+  min-height: 46px;
 }
 
 /* ============================================================
-   配置页 · 对齐列表：表头与数据行共享同一网格模板，纵向对齐
-   取代原来「写死 px 宽度的散排输入框」，消除杂乱
+   对齐列表：表头与数据行共享同一网格模板，纵向对齐
    ============================================================ */
 .ls-list {
   margin-top: 12px;
@@ -880,10 +882,10 @@ body {
 .ls-list-head {
   padding: 0 4px 8px;
   border-bottom: 1px solid var(--ls-line);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .ls-list-head > span {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -900,7 +902,6 @@ body {
   white-space: nowrap;
 }
 
-/* 各列表的列宽模板（head 与 row 一致 → 对齐） */
 .ls-list--records .ls-list-head,
 .ls-list--records .ls-list-row {
   grid-template-columns: minmax(180px, 1.2fr) 110px minmax(180px, 1.4fr) 110px 72px;
@@ -929,22 +930,22 @@ body {
   }
 }
 
-/* 服务实例分组卡片：浅底容器替代 panel 套 panel，层次干净 */
+/* 服务实例分组卡片：更实的灰底容器替代 panel 套 panel，层次干净且可辨 */
 .ls-group {
-  background: var(--ls-bg-soft);
-  border: 1px solid var(--ls-line-soft);
+  background: var(--ls-group-bg);
+  border: 1px solid var(--ls-line);
   border-radius: var(--ls-radius-sm);
-  padding: 18px 20px;
-  margin-bottom: 14px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
 }
 .ls-group-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .ls-group-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ls-ink);
 }
@@ -952,7 +953,7 @@ body {
   margin-bottom: 4px;
 }
 .ls-group .ls-field:last-child {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 /* 服务实例 4 列在窄屏折叠为 2 列 */
@@ -963,4 +964,87 @@ body {
   .ls-grid--services {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* ============================================================
+   图标基础（统一描边图标，stroke=currentColor）
+   ============================================================ */
+.ls-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex: none;
+}
+.ls-ico svg {
+  display: block;
+}
+/* 面板标题图标：主色强调 */
+.ls-panel-title .ls-ico {
+  color: var(--ls-accent);
+}
+/* 按钮 / 标签页内的图标：与文字对齐 */
+.arco-btn .ls-ico,
+.arco-tabs-tab .ls-ico {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+/* 语义色调（用于指标卡图标与左侧色条、记录类型色条） */
+:root {
+  --ls-tone-blue: #1c7ed6;
+  --ls-tone-indigo: #3b5bdb;
+  --ls-tone-green: #2b8a3e;
+  --ls-tone-teal: #0ca678;
+  --ls-tone-purple: #7048e8;
+  --ls-tone-amber: #e8920c;
+  --ls-tone-cyan: #0c8599;
+  --ls-tone-orange: #e8590c;
+}
+.tone-blue { --tc: var(--ls-tone-blue); }
+.tone-indigo { --tc: var(--ls-tone-indigo); }
+.tone-green { --tc: var(--ls-tone-green); }
+.tone-teal { --tc: var(--ls-tone-teal); }
+.tone-purple { --tc: var(--ls-tone-purple); }
+.tone-amber { --tc: var(--ls-tone-amber); }
+.tone-cyan { --tc: var(--ls-tone-cyan); }
+.tone-orange { --tc: var(--ls-tone-orange); }
+
+/* 指标卡图标：大号圆角矩形 + 轻色调底 + 彩色图标，位于卡片左侧 */
+.ls-metric-ico {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--tc, var(--ls-accent));
+  background: color-mix(in srgb, var(--tc, var(--ls-accent)) 14%, var(--ls-surface));
+  border: 1px solid color-mix(in srgb, var(--tc, var(--ls-accent)) 28%, transparent);
+}
+.ls-metric-card.has-tone {
+  border-left: 3px solid var(--tc, var(--ls-accent));
+}
+.ls-metric-card.has-tone:hover {
+  border-left-color: var(--tc, var(--ls-accent));
+}
+
+/* 资源记录：按类型加左侧色条，快速区分 A / AAAA / PTR / SRV / TXT */
+.ls-list--records .ls-list-row {
+  padding-left: 6px;
+}
+.ls-list--records .ls-list-row.rec-a {
+  box-shadow: inset 3px 0 0 var(--ls-tone-blue);
+}
+.ls-list--records .ls-list-row.rec-aaaa {
+  box-shadow: inset 3px 0 0 var(--ls-tone-indigo);
+}
+.ls-list--records .ls-list-row.rec-ptr {
+  box-shadow: inset 3px 0 0 var(--ls-tone-teal);
+}
+.ls-list--records .ls-list-row.rec-srv {
+  box-shadow: inset 3px 0 0 var(--ls-tone-purple);
+}
+.ls-list--records .ls-list-row.rec-txt {
+  box-shadow: inset 3px 0 0 var(--ls-tone-amber);
 }

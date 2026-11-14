@@ -16,3 +16,6 @@ logs/
 config.yaml
 deploy/data/
 data/
+
+# Local agent workspace memory — machine-local, not part of the repo
+.workbuddy/

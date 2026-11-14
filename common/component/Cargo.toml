@@ -1,0 +1,17 @@
+[package]
+name = "common-component"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Shared M3 component runtime: unified contract endpoints, config lifecycle, offline console"
+
+[dependencies]
+common-config = { workspace = true }
+common-crypto = { workspace = true }
+common-api = { workspace = true }
+common-auth = { workspace = true }
+common-alert = { workspace = true }
+common-log = { workspace = true }
+common-health = { workspace = true }
+common-metrics = { workspace = true }

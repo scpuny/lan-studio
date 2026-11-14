@@ -2,29 +2,47 @@
   <div>
     <div class="ls-panel">
       <div class="ls-panel-title">
+        <Icon name="gauge" />
         运行状态
         <span class="ls-hint">每 5 秒静默刷新，不触发布局动画</span>
       </div>
       <div class="ls-grid ls-grid--status">
-        <div v-for="item in lights" :key="item.label" class="ls-metric-card">
-          <div class="ls-inline">
-            <span class="ls-dot" :class="item.cls"></span>
-            <div>
-              <div class="ls-kpi-label">{{ item.label }}</div>
-              <div class="ls-kpi-value small">{{ item.value }}</div>
+        <div
+          v-for="item in lights"
+          :key="item.label"
+          class="ls-metric-card has-tone"
+          :class="`tone-${item.tone}`"
+        >
+          <span class="ls-metric-ico"><Icon :name="item.icon" :size="22" /></span>
+          <div class="ls-metric-body">
+            <div class="ls-kpi-label">
+              <span class="ls-dot" :class="item.cls"></span>{{ item.label }}
             </div>
+            <div class="ls-kpi-value small">{{ item.value }}</div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="ls-panel">
-      <div class="ls-panel-title">协议计数</div>
+      <div class="ls-panel-title">
+        <Icon name="hash" />
+        协议计数
+      </div>
       <div class="ls-grid ls-grid--counters">
-        <div v-for="item in counters" :key="item.label" class="ls-metric-card">
-          <div class="ls-kpi-label">{{ item.label }}</div>
-          <div class="ls-kpi-value">{{ item.value }}</div>
-          <div v-if="item.foot" class="ls-kpi-foot">{{ item.foot }}</div>
+        <div
+          v-for="item in counters"
+          :key="item.label"
+          class="ls-metric-card has-tone"
+          :class="`tone-${item.tone}`"
+        >
+          <span class="ls-metric-ico"><Icon :name="item.icon" :size="22" /></span>
+          <div class="ls-metric-body">
+            <div class="ls-kpi-label">
+              {{ item.label }}<span v-if="item.foot" class="ls-muted"> · {{ item.foot }}</span>
+            </div>
+            <div class="ls-kpi-value">{{ item.value }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -32,6 +50,7 @@
     <!-- F-D04: health lights + list -->
     <div class="ls-panel">
       <div class="ls-panel-title">
+        <Icon name="heart" />
         业务健康目标
         <span class="ls-hint">TCP 探测，与 /healthz 存活探针无关</span>
         <div class="ls-header-spacer"></div>
@@ -81,6 +100,7 @@
     <!-- F-H05: in-console navigation to registered services -->
     <div class="ls-panel">
       <div class="ls-panel-title">
+        <Icon name="compass" />
         服务导航
         <span class="ls-hint">辅助入口：仅跳转已登记名称，不改变 DNS 边界</span>
       </div>
@@ -119,6 +139,7 @@
 
     <div class="ls-panel">
       <div class="ls-panel-title">
+        <Icon name="info" />
         跳转说明
         <span class="ls-hint">PRD 1.4 边界</span>
       </div>
@@ -137,6 +158,7 @@ import { Message } from '@arco-design/web-vue'
 import type { TableColumnData } from '@arco-design/web-vue'
 import { errorMessage, get } from '../api'
 import { emptyStatus } from '../defaults'
+import Icon from '../Icon.vue'
 import { formatBytes, formatTime, usePolling } from '../poll'
 import { isStructuredConfig } from '../types'
 import type {
@@ -158,12 +180,16 @@ interface Light {
   label: string
   value: string
   cls: string
+  icon: string
+  tone: string
 }
 
 interface Counter {
   label: string
   value: string | number
   foot: string
+  icon: string
+  tone: string
 }
 
 interface HealthRow extends HealthTargetStatus {
@@ -216,43 +242,55 @@ const lights = computed<Light[]>(() => [
     label: 'mDNS 引擎',
     value: status.running ? '运行中' : '停止',
     cls: status.running ? 'is-up' : 'is-down',
+    icon: 'cpu',
+    tone: 'blue',
   },
   {
     label: '写保护',
     value: status.security.password_set ? '密码已设置' : '未初始化',
     cls: status.security.password_set ? 'is-up' : 'is-warn',
+    icon: 'lock',
+    tone: 'indigo',
   },
   {
     label: 'HTTP 网关',
     value: gatewayEnabled.value ? `监听 ${gateway.port}` : '已关闭',
     cls: gatewayEnabled.value ? 'is-up' : 'is-unknown',
+    icon: 'globe',
+    tone: 'cyan',
   },
   {
     label: '告警通道',
     value: status.alerts.enabled ? `${status.alerts.webhooks} 个 Webhook` : '未启用',
     cls: status.alerts.enabled ? 'is-up' : 'is-unknown',
+    icon: 'bell',
+    tone: 'purple',
   },
   {
     label: '健康目标',
     value: `${health.up} 正常 / ${health.down} 异常`,
     cls: health.down > 0 ? 'is-down' : health.up > 0 ? 'is-up' : 'is-unknown',
+    icon: 'heart',
+    tone: 'green',
   },
   {
     label: '名称冲突',
     value: status.conflicts ? `${status.conflicts} 条` : '无',
     cls: status.conflicts ? 'is-warn' : 'is-up',
+    icon: 'alert',
+    tone: 'amber',
   },
 ])
 
 const counters = computed<Counter[]>(() => [
-  { label: '资源记录', value: status.records, foot: '/api/records' },
-  { label: '查询', value: status.queries, foot: '收到的问题报文' },
-  { label: '应答', value: status.responses, foot: '发出的应答报文' },
-  { label: '外来记录', value: status.ingested, foot: '局域网观测到的 RR' },
-  { label: '主动宣告', value: status.announces, foot: '启动 + 周期' },
-  { label: '畸形报文', value: status.malformed, foot: '解析失败计数' },
-  { label: '入流量', value: formatBytes(status.bytes_in), foot: '累计字节' },
-  { label: '出流量', value: formatBytes(status.bytes_out), foot: '累计字节' },
+  { label: '资源记录', value: status.records, foot: '/api/records', icon: 'layers', tone: 'blue' },
+  { label: '查询', value: status.queries, foot: '收到的问题报文', icon: 'search', tone: 'indigo' },
+  { label: '应答', value: status.responses, foot: '发出的应答报文', icon: 'reply', tone: 'green' },
+  { label: '外来记录', value: status.ingested, foot: '局域网观测到的 RR', icon: 'inbox', tone: 'teal' },
+  { label: '主动宣告', value: status.announces, foot: '启动 + 周期', icon: 'broadcast', tone: 'purple' },
+  { label: '畸形报文', value: status.malformed, foot: '解析失败计数', icon: 'alert', tone: 'amber' },
+  { label: '入流量', value: formatBytes(status.bytes_in), foot: '累计字节', icon: 'arrowDown', tone: 'cyan' },
+  { label: '出流量', value: formatBytes(status.bytes_out), foot: '累计字节', icon: 'arrowUp', tone: 'orange' },
 ])
 
 function openService(service: ServiceRow): void {

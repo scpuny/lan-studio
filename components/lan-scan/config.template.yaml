@@ -1,0 +1,45 @@
+version: 1
+component: lan-scan
+
+server:
+  listen: "127.0.0.1"
+  port: 8083
+  webui: true
+  admin_token: ""
+  log_level: info
+
+observability:
+  metrics: true
+  alerts: true
+  history_limit: 30
+
+logging:
+  max_bytes: 1048576
+  backup_count: 3
+  level: info
+
+alerts:
+  enabled: true
+  webhooks: []
+  cooldown_seconds: 300
+  timeout_seconds: 5.0
+  max_retries: 2
+
+# --- lan-scan business configuration (PRD 4.5: read-only, bounded) ---
+scan:
+  # Hard ceilings: a scan can never exceed max_hosts hosts or max_ports ports.
+  max_hosts: 4096
+  max_ports: 64
+  rate_per_second: 200
+  concurrency: 16
+  connect_timeout_ms: 300
+  # Banner is read-only; no payload is ever written to a probed socket.
+  banner_bytes: 64
+  ports:
+    - 22
+    - 80
+    - 443
+    - 5353
+    - 8080
+  results_path: "lan-scan.results.json"
+  max_results: 200

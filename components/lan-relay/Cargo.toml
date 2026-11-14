@@ -1,0 +1,15 @@
+[package]
+name = "lan-relay"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio cross-segment mDNS relay (M3) with hard loop-detection acceptance"
+
+[dependencies]
+common-component = { workspace = true }
+common-config = { workspace = true }
+common-crypto = { workspace = true }
+common-api = { workspace = true }
+common-net = { workspace = true }
+common-metrics = { workspace = true }

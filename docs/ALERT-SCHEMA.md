@@ -29,6 +29,7 @@
 | `gateway_target_unreachable` | `lan-mdns` | info | 已登记域名转发目标不可达 | `host` | 600s |
 | `relay_loop_detected` | `lan-relay` | critical | 包指纹窗口命中重复转发 | `interface,fingerprint` | 60s |
 | `relay_ttl_exceeded` | `lan-relay` | warning | 转发跳数归零被丢弃 | `interface` | 600s |
+| `cert_issued` | `lan-ca` | info | 内网域名证书签发成功 | `subject,serial` | 0s |
 | `cert_expiring` | `lan-ca` | warning | 证书剩余有效期低于阈值 | `subject,days_left` | 86400s |
 | `cert_revoked` | `lan-ca` | info | 证书被吊销 | `subject,serial` | 0s |
 | `scan_anomaly` | `lan-scan` | info | 扫描速率或异常响应超阈值 | `segment,reason` | 600s |

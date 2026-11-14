@@ -1,0 +1,14 @@
+[package]
+name = "lan-ca"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio lightweight internal CA (M3): issue, renew, revoke, audit"
+
+[dependencies]
+common-component = { workspace = true }
+common-config = { workspace = true }
+common-crypto = { workspace = true }
+common-api = { workspace = true }
+common-metrics = { workspace = true }

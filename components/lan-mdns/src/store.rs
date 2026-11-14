@@ -222,7 +222,7 @@ impl ConfigStore {
                 .collect(),
             Err(_) => Vec::new(),
         };
-        files.sort_by(|left, right| right.0.cmp(&left.0));
+        files.sort_by_key(|item| std::cmp::Reverse(item.0));
         files
             .into_iter()
             .filter_map(|(_, path)| {
@@ -324,7 +324,7 @@ impl ConfigStore {
                 Some((modified, entry.path()))
             })
             .collect();
-        files.sort_by(|left, right| right.0.cmp(&left.0));
+        files.sort_by_key(|item| std::cmp::Reverse(item.0));
         for (_, path) in files.iter().skip(self.history_limit) {
             if keep.is_some_and(|id| path.file_name().and_then(|n| n.to_str()) == Some(id)) {
                 continue;

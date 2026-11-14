@@ -65,6 +65,30 @@ lanstudio_<c>_<metric>[_<unit>]
 `gateway_requests_total`）以及 `alerts_sent_total{kind,result}` 的真实样本。
 冒烟脚本对 16 个族的存在性、标签取值、双前缀与开关 0/1 均有断言。
 
+## 3.5 M3 组件专有指标
+
+> 三组件共用 `common-component` 运行时，第 2 节 9 项必备族自动输出；下表为各组件业务族。
+
+| 组件 | 指标 | 类型 | 标签 | 说明 |
+| --- | --- | --- | --- | --- |
+| `lan-relay` | `lanstudio_relay_packets_received_total` | counter | — | 环路检测观察到的报文数 |
+| | `lanstudio_relay_packets_forwarded_total` | counter | — | 实际转发数（受每秒硬上限约束） |
+| | `lanstudio_relay_bytes_forwarded_total` | counter | — | 转发字节 |
+| | `lanstudio_relay_loop_dropped_total` | counter | `reason` | 丢弃原因：`duplicate` / `same_interface` / `ttl_exceeded` / `self_generated` / `outside_whitelist` / `rate_limited` / `malformed` |
+| | `lanstudio_relay_fingerprint_entries` | gauge | — | 指纹窗口当前条目（有界） |
+| `lan-ca` | `lanstudio_ca_certificates` | gauge | `status` | `active` / `revoked` |
+| | `lanstudio_ca_issued_total` | counter | — | 累计签发 |
+| | `lanstudio_ca_revoked_total` | counter | — | 累计吊销 |
+| | `lanstudio_ca_audit_entries` | gauge | — | 审计记录数（有界 500） |
+| `lan-scan` | `lanstudio_scan_hosts_total` | counter | — | 上次扫描主机数 |
+| | `lanstudio_scan_probes_total` | counter | — | 实际 TCP 探测数 |
+| | `lanstudio_scan_throttled_total` | counter | — | 被速率上限拒绝的探测数 |
+| | `lanstudio_scan_open_ports` | gauge | — | 上次扫描开放端口数 |
+| | `lanstudio_scan_results` | gauge | — | 保留结果行数（有界） |
+| | `lanstudio_scan_rate_per_second` | gauge | — | 配置的速率上限 |
+
+所有标签均为**固定枚举或聚合值**，不含 IP / 域名 / 序列号，符合第 4 节基数控制。
+
 ## 4. 标签规范（强制）
 
 1. `path` 必须是**路由模板**（如 `/api/config/snapshot`），禁止使用原始 URL 或带查询参数的路径。

@@ -1,6 +1,7 @@
 <template>
   <div class="ls-panel">
     <div class="ls-panel-title">
+      <Icon name="doc" />
       运行日志
       <span class="ls-hint">结构化记录：ts / level / source / msg / request_id</span>
     </div>
@@ -63,6 +64,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { get } from '../api'
+import Icon from '../Icon.vue'
 import { emptyLogs } from '../defaults'
 import { formatBytes } from '../poll'
 import type { LogLevel, LogRecord, LogsData } from '../types'

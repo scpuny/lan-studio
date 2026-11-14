@@ -2,6 +2,7 @@
   <div>
     <div class="ls-panel">
       <div class="ls-panel-title">
+        <Icon name="sliders" />
         配置管理
         <span class="ls-hint">表单与源码是同一份文档；保存前服务端离线校验，失败不落盘</span>
         <div class="ls-header-spacer"></div>
@@ -131,6 +132,7 @@
 
           <a-tab-pane key="records" title="域名与服务">
             <div class="ls-panel-title">
+              <Icon name="layers" />
               资源记录
               <span class="ls-hint">A / AAAA / PTR / SRV / TXT；TTL 留 0 表示跟随全局</span>
               <div class="ls-header-spacer"></div>
@@ -145,7 +147,12 @@
                 <span>TTL</span>
                 <span></span>
               </div>
-              <div v-for="(record, index) in model.mdns.records" :key="`r${index}`" class="ls-list-row">
+              <div
+                v-for="(record, index) in model.mdns.records"
+                :key="`r${index}`"
+                class="ls-list-row"
+                :class="`rec-${String(record.type).toLowerCase()}`"
+              >
                 <a-input v-model="record.name" placeholder="nas.local" />
                 <a-select v-model="record.type">
                   <a-option v-for="type in RECORD_TYPES" :key="type" :value="type">
@@ -161,6 +168,7 @@
             </div>
 
             <div class="ls-panel-title" style="margin-top: 22px">
+              <Icon name="server" />
               服务实例（DNS-SD）
               <span class="ls-hint">自动生成 PTR / SRV / TXT 与服务类型枚举</span>
               <div class="ls-header-spacer"></div>
@@ -223,6 +231,7 @@
             </div>
 
             <div class="ls-panel-title" style="margin-top: 22px">
+              <Icon name="heart" />
               健康目标
               <span class="ls-hint">TCP 连接探测；别名用于指标标签</span>
               <div class="ls-header-spacer"></div>
@@ -287,6 +296,7 @@
             </div>
 
             <div class="ls-panel-title" style="margin-top: 12px">
+              <Icon name="route" />
               静态路由覆盖
               <span class="ls-hint">未列出的服务按已发布 A 记录自动生成路由</span>
               <div class="ls-header-spacer"></div>
@@ -329,6 +339,7 @@
             </div>
 
             <div class="ls-panel-title">
+              <Icon name="network" />
               已配置地址
               <span class="ls-hint">仅 <code>specified</code> 模式读取此列表</span>
               <div class="ls-header-spacer"></div>
@@ -352,6 +363,7 @@
             </div>
 
             <div class="ls-panel-title" style="margin-top: 18px">
+              <Icon name="cpu" />
               运行态网卡
               <span class="ls-hint">来自 <code>/api/interfaces</code></span>
               <div class="ls-header-spacer"></div>
@@ -523,6 +535,7 @@ import { nextTick, reactive, ref, watch } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import type { TableColumnData } from '@arco-design/web-vue'
 import { errorMessage, get, isApiError, isAuthError, post } from '../api'
+import Icon from '../Icon.vue'
 import {
   LEVELS,
   RECORD_TYPES,

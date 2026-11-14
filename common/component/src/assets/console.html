@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lan Studio Console</title>
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--rail:#ffffff;--ink:#1d2430;--ink2:#5a6473;--ink3:#8b94a3;
+  --line:#e7e9ee;--line-soft:#eef0f4;--accent:#3b5bdb;--accent2:#4263eb;--accent-soft:rgba(59,91,219,.1);
+  --tile:#f7f8fa;--tile-hover:#eef1f8;--field:#ffffff;--field-border:#d8dce4;--group:#f3f5f9;
+  --up:#2b8a3e;--down:#e03131;--warn:#e8920c;--info:#1c7ed6;--radius:10px;--radius-sm:8px;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 2px 6px rgba(16,24,40,.05);
+}
+[theme="dark"]{
+  --bg:#0e1014;--surface:#161a21;--rail:#12151b;--ink:#e7eaf0;--ink2:#a6afbe;--ink3:#6c7585;
+  --line:rgba(255,255,255,.09);--line-soft:rgba(255,255,255,.05);--accent:#5c7cfa;--accent2:#748ffc;
+  --accent-soft:rgba(92,124,250,.16);--tile:rgba(255,255,255,.035);--tile-hover:rgba(92,124,250,.1);
+  --field:rgba(255,255,255,.07);--field-border:rgba(255,255,255,.15);--group:rgba(255,255,255,.04);
+  --shadow:0 1px 2px rgba(0,0,0,.2);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+.ls-app{min-height:100vh}
+.ls-rail{position:fixed;inset:0 auto 0 0;width:240px;background:var(--rail);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 14px;z-index:5}
+.ls-brand{display:flex;align-items:center;gap:11px;padding:0 8px 24px}
+.ls-brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:grid;place-items:center;flex:none}
+.ls-brand-mark svg{width:19px;height:19px}
+.ls-brand-name{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.ls-brand-sub{font-size:10.5px;color:var(--ink3);font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.ls-nav-label{padding:0 10px 8px;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.ls-nav{display:flex;flex-direction:column;gap:3px}
+.ls-nav-item{display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--ink2);cursor:pointer;text-align:left;font-size:14px;font-weight:500}
+.ls-nav-item:hover{background:var(--tile);color:var(--ink)}
+.ls-nav-item.on{background:var(--accent-soft);color:var(--accent);font-weight:700}
+.ls-nav-item svg{width:17px;height:17px;flex:none}
+.ls-rail-foot{margin-top:auto;padding:14px 10px 0;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)}
+.ls-main{margin-left:240px;padding:26px 34px 64px;max-width:1600px}
+.ls-topbar{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.ls-eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.ls-title{font-size:23px;font-weight:700;letter-spacing:-.02em;margin:0}
+.ls-sub{color:var(--ink2);font-size:13px;margin-top:4px}
+.ls-top-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ls-input,.ls-textarea{background:var(--field);border:1px solid var(--field-border);border-radius:var(--radius-sm);padding:8px 11px;outline:none;min-width:0}
+.ls-input:focus,.ls-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ls-btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius-sm);padding:8px 14px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
+.ls-btn:hover{border-color:var(--ink3)}
+.ls-btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff}
+.ls-btn.danger{color:var(--down)}
+.ls-icon-btn{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius-sm);cursor:pointer}
+.ls-icon-btn svg{width:16px;height:16px}
+.ls-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:16px}
+.ls-panel-title{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;margin-bottom:16px;flex-wrap:wrap}
+.ls-panel-title svg{width:17px;height:17px;color:var(--accent)}
+.ls-hint{font-size:12px;font-weight:400;color:var(--ink3)}
+.ls-spacer{flex:1}
+.ls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.ls-card{display:flex;align-items:center;gap:14px;background:var(--tile);border:1px solid var(--line);border-left:3px solid var(--tc,var(--accent));border-radius:var(--radius-sm);padding:14px 15px;min-width:0}
+.ls-card-ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none;color:var(--tc,var(--accent));background:color-mix(in srgb,var(--tc,var(--accent)) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--tc,var(--accent)) 26%,transparent)}
+.ls-card-ico svg{width:21px;height:21px}
+.ls-card-body{margin-left:auto;text-align:right;min-width:0}
+.ls-card-label{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--ink3);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-card-value{font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-card-foot{font-size:11px;color:var(--ink3)}
+.tone-blue{--tc:#1c7ed6}.tone-indigo{--tc:#3b5bdb}.tone-green{--tc:#2b8a3e}.tone-cyan{--tc:#0c8599}.tone-purple{--tc:#7048e8}.tone-amber{--tc:#e8920c}.tone-teal{--tc:#0ca678}.tone-red{--tc:#e03131}
+.ls-note{color:var(--ink3);font-size:13px;padding:14px 0}
+.ls-code{width:100%;min-height:360px;background:var(--field);border:1px solid var(--field-border);border-radius:var(--radius-sm);padding:12px;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;white-space:pre;overflow:auto}
+.ls-log{background:var(--tile);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;max-height:440px;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.ls-log-row{padding:3px 0;border-bottom:1px solid var(--line-soft);display:flex;gap:10px}
+.ls-log-row .lv{font-weight:700;width:64px;flex:none;text-transform:uppercase;font-size:10.5px;padding-top:2px}
+.lv.error{color:var(--down)}.lv.warning{color:var(--warn)}.lv.info{color:var(--info)}.lv.debug{color:var(--ink3)}
+.ls-log-row .msg{word-break:break-all;color:var(--ink2);flex:1}
+.ls-list{display:flex;flex-direction:column}
+.ls-list-row{display:grid;grid-template-columns:1.1fr 1fr .8fr 120px;gap:10px;align-items:center;padding:10px 8px;border-bottom:1px solid var(--line-soft);font-size:13px}
+.ls-list-head{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.ls-alert{padding:10px 13px;border-radius:var(--radius-sm);margin-bottom:12px;font-size:13px;border:1px solid var(--line)}
+.ls-alert.ok{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.ls-alert.bad{background:color-mix(in srgb,var(--down) 10%,transparent);color:var(--down);border-color:transparent}
+.ls-dot{width:8px;height:8px;border-radius:50%;background:var(--ink3);display:inline-block;flex:none}
+.ls-dot.up{background:var(--up)}.ls-dot.down{background:var(--down)}.ls-dot.warn{background:var(--warn)}
+.ls-inline{display:flex;align-items:center;gap:8px}
+.ls-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ls-muted{color:var(--ink3)}
+.ls-badge{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--tile);border:1px solid var(--line);font-size:11px;color:var(--ink2)}
+@media(max-width:980px){.ls-rail{position:static;width:100%;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:12px}.ls-nav{flex-direction:row;flex-wrap:wrap}.ls-nav-item{width:auto}.ls-rail-foot,.ls-nav-label,.ls-brand-sub{display:none}.ls-main{margin-left:0;padding:20px}}
+@media(max-width:640px){.ls-grid{grid-template-columns:1fr}.ls-list-row{grid-template-columns:1fr 1fr}.ls-list-head{display:none}}
+</style>
+</head>
+<body>
+<div class="ls-app" id="app">
+  <aside class="ls-rail">
+    <div class="ls-brand">
+      <div class="ls-brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13"/></svg></div>
+      <div><div class="ls-brand-name">Lan Studio</div><div class="ls-brand-sub" id="brandSub">Component Console</div></div>
+    </div>
+    <div class="ls-nav-label">Workspace</div>
+    <nav class="ls-nav" id="nav"></nav>
+    <div class="ls-rail-foot"><span class="ls-dot up" id="healthDot"></span> <span id="healthText">连接中…</span></div>
+  </aside>
+  <main class="ls-main">
+    <div class="ls-topbar">
+      <div><div class="ls-eyebrow" id="eyebrow">LAN STUDIO / COMPONENT</div><h1 class="ls-title" id="pageTitle">状态总览</h1><div class="ls-sub" id="pageSub">统一契约 · 离线控制台</div></div>
+      <div class="ls-top-actions">
+        <input class="ls-input" id="adminPwd" type="password" placeholder="管理员密码" style="width:150px" title="写操作需要 X-Admin-Password">
+        <button class="ls-icon-btn" id="themeBtn" title="切换深浅主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg></button>
+        <button class="ls-btn" id="refreshBtn">刷新</button>
+      </div>
+    </div>
+    <div id="flash"></div>
+
+    <section data-page="overview">
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>运行状态<span class="ls-hint">每 5 秒静默刷新</span></div><div class="ls-grid" id="statusGrid"></div></div>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 12h4l2.5 7L14 4l2.5 8H21"/></svg>组件详情<span class="ls-hint">来自 /api/status 的组件自有字段</span></div><div id="statusRaw" class="ls-note">加载中…</div></div>
+    </section>
+
+    <section data-page="config" hidden>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>配置管理<span class="ls-hint">保存走 校验 → 快照 → 原子替换 → 热重载</span></div>
+        <div class="ls-row" style="margin-bottom:12px"><button class="ls-btn primary" id="saveBtn">校验并保存</button><button class="ls-btn" id="reloadBtn">重新载入</button><button class="ls-btn" id="exportBtn">导出快照</button><label class="ls-btn" style="cursor:pointer">导入快照<input type="file" id="importFile" accept=".json,application/json" hidden></label><span class="ls-muted" id="cfgMeta"></span></div>
+        <textarea class="ls-code" id="configText" spellcheck="false"></textarea>
+      </div>
+    </section>
+
+    <section data-page="observe" hidden>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 12h4l2.5 7L14 4l2.5 8H21"/></svg>Prometheus 指标<span class="ls-hint">/api/metrics · version 0.0.4</span></div><pre class="ls-code" id="metricsBox" style="min-height:280px">加载中…</pre></div>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M12.5 15h4.5"/></svg>最近日志<span class="ls-hint">结构化记录，同源同构</span></div><div class="ls-log" id="observeLogs"></div></div>
+    </section>
+
+    <section data-page="logs" hidden>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M12.5 15h4.5"/></svg>运行日志<span class="ls-hint">ts / level / source / msg / extra</span><span class="ls-spacer"></span><select class="ls-input" id="logLevel"><option value="">全部级别</option><option value="error">error</option><option value="warning">warning</option><option value="info">info</option><option value="debug">debug</option></select><button class="ls-btn" id="logRefresh">刷新</button></div><div class="ls-log" id="logsBox"></div></div>
+    </section>
+
+    <section data-page="alerts" hidden>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M18 9a6 6 0 0 0-12 0c0 5-2 6-2 6h16s-2-1-2-6M10 20a2 2 0 0 0 4 0"/></svg>告警通道<span class="ls-hint">规范事件 · 有界队列 · 冷却</span></div><div class="ls-grid" id="alertsGrid"></div></div>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>最近事件</div><div id="alertEvents" class="ls-note">暂无事件</div></div>
+    </section>
+
+    <section data-page="history" hidden>
+      <div class="ls-panel"><div class="ls-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/></svg>版本历史<span class="ls-hint">保存 / 回滚 / 导入前自动快照，按时间倒序</span><span class="ls-spacer"></span><button class="ls-btn" id="historyRefresh">刷新</button></div>
+        <div class="ls-list"><div class="ls-list-row ls-list-head"><span>时间</span><span>原因</span><span>大小</span><span>操作</span></div><div id="historyRows"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+(function(){
+  var ICONS={
+    grid:'<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
+    sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+    activity:'<path d="M3 12h4l2.5 7L14 4l2.5 8H21"/>',
+    terminal:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M12.5 15h4.5"/>',
+    bell:'<path d="M18 9a6 6 0 0 0-12 0c0 5-2 6-2 6h16s-2-1-2-6M10 20a2 2 0 0 0 4 0"/>',
+    history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/>'
+  };
+  var PAGES=[
+    {k:'overview',t:'状态总览',s:'引擎状态与关键计数',i:'grid'},
+    {k:'config',t:'配置管理',s:'声明式配置与生命周期',i:'sliders'},
+    {k:'observe',t:'可观测',s:'指标与日志',i:'activity'},
+    {k:'logs',t:'日志',s:'结构化日志与实时流',i:'terminal'},
+    {k:'alerts',t:'告警',s:'告警编排器状态',i:'bell'},
+    {k:'history',t:'版本历史',s:'快照与回滚',i:'history'}
+  ];
+  var TONES=['tone-blue','tone-indigo','tone-green','tone-cyan','tone-purple','tone-amber','tone-teal','tone-red'];
+  var state={page:'overview',component:'component',status:null};
+  function svg(n){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[n]||'')+'</svg>';}
+  function esc(v){return String(v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function q(s){return document.querySelector(s);}
+  function ce(t){return document.createElement(t);}
+  function pw(){return q('#adminPwd').value;}
+  function headers(write){var h={'Content-Type':'application/json'};if(write&&pw())h['X-Admin-Password']=pw();return h;}
+  async function api(path,opt){
+    opt=opt||{};
+    var r=await fetch(path,{method:opt.method||'GET',headers:headers(opt.write),body:opt.body||undefined});
+    var j=await r.json().catch(function(){return {ok:false,error:{message:'invalid response'}};});
+    if(!r.ok||j.ok===false)throw new Error((j.error&&(j.error.code+': '+j.error.message))||('HTTP '+r.status));
+    return j.data;
+  }
+  function flash(msg,bad){q('#flash').innerHTML='<div class="ls-alert '+(bad?'bad':'ok')+'">'+esc(msg)+'</div>';setTimeout(function(){q('#flash').innerHTML='';},5000);}
+  function card(label,value,foot,idx){
+    var d=ce('div');d.className='ls-card '+TONES[idx%TONES.length];
+    d.innerHTML='<span class="ls-card-ico">'+svg('activity')+'</span><div class="ls-card-body"><div class="ls-card-label">'+esc(label)+'</div><div class="ls-card-value">'+esc(value)+'</div>'+(foot?'<div class="ls-card-foot">'+esc(foot)+'</div>':'')+'</div>';
+    return d;
+  }
+  function renderNav(){
+    var nav=q('#nav');nav.innerHTML='';
+    PAGES.forEach(function(p){var b=ce('button');b.className='ls-nav-item'+(state.page===p.k?' on':'');b.innerHTML=svg(p.i)+'<span>'+esc(p.t)+'</span>';b.onclick=function(){go(p.k);};nav.appendChild(b);});
+  }
+  function go(k){
+    state.page=k;renderNav();
+    var p=PAGES.filter(function(x){return x.k===k;})[0];
+    q('#pageTitle').textContent=p.t;q('#pageSub').textContent=p.s+' · '+state.component;
+    document.querySelectorAll('section[data-page]').forEach(function(s){s.hidden=s.getAttribute('data-page')!==k;});
+    load(k);
+  }
+  async function loadStatus(){
+    try{
+      var d=await api('/api/status');state.status=d;state.component=d.component||'component';
+      q('#brandSub').textContent=state.component;q('#eyebrow').textContent='LAN STUDIO / '+String(state.component).toUpperCase();
+      q('#pageSub').textContent=(PAGES.filter(function(x){return x.k===state.page;})[0]||{s:'统一契约'}).s+' · '+state.component;
+      document.title=state.component+' · Lan Studio';
+      q('#healthDot').className='ls-dot up';q('#healthText').textContent='服务正常 · '+Math.round(d.uptime_seconds||0)+'s';
+      if(state.page==='overview'){
+        var g=q('#statusGrid');g.innerHTML='';var i=0;
+        Object.keys(d).forEach(function(k){var v=d[k];if(v&&typeof v==='object')return;g.appendChild(card(k.replace(/_/g,' '),v===true?'是':v===false?'否':v,null,i++));});
+        q('#statusRaw').textContent=JSON.stringify(d,null,2);q('#statusRaw').className='ls-code';q('#statusRaw').style.minHeight='240px';
+      }
+    }catch(e){q('#healthDot').className='ls-dot down';q('#healthText').textContent='连接失败';flash(String(e.message),true);}
+  }
+  async function loadConfig(){try{var d=await api('/api/config');q('#configText').value=d.raw||'';q('#cfgMeta').textContent='结构化字段 '+Object.keys(d.structured||{}).length+' 项';}catch(e){flash(String(e.message),true);}}
+  async function loadMetrics(){try{var r=await fetch('/api/metrics');q('#metricsBox').textContent=await r.text();}catch(e){flash(String(e.message),true);}}
+  function renderLogs(box,items){
+    box.innerHTML='';if(!items.length){box.innerHTML='<div class="ls-note">暂无日志</div>';return;}
+    items.forEach(function(o){
+      var row=ce('div');row.className='ls-log-row';
+      var lv=(o.level||'info').toLowerCase();var t=o.ts?new Date(o.ts*1000).toLocaleString():'';
+      row.innerHTML='<span class="lv '+esc(lv)+'">'+esc(lv)+'</span><span class="msg">'+esc((o.msg||'')+' '+(o.extra&&Object.keys(o.extra).length?JSON.stringify(o.extra):''))+'</span><span class="ls-muted">'+esc(t)+'</span>';
+      box.appendChild(row);
+    });
+  }
+  async function loadLogs(){
+    try{var lv=q('#logLevel').value;var d=await api('/api/logs?limit=200');var items=d.logs||[];
+      var parsed=items.map(function(x){try{return typeof x==='string'?JSON.parse(x):x;}catch(e){return {msg:x,level:'info'};}});
+      if(lv)parsed=parsed.filter(function(x){return x.level===lv;});
+      renderLogs(q('#logsBox'),parsed);renderLogs(q('#observeLogs'),parsed.slice(0,25));
+    }catch(e){flash(String(e.message),true);}
+  }
+  async function loadAlerts(){
+    try{var d=await api('/api/alerts');var g=q('#alertsGrid');g.innerHTML='';var i=0;
+      [['状态',d.enabled?'已启用':'未启用'],['已发送',d.sent],['队列',d.queued+' / '+d.queue_capacity],['失败',d.failed],['丢弃',d.dropped],['冷却抑制',d.suppressed]].forEach(function(x){g.appendChild(card(x[0],x[1],null,i++));});
+      var ev=q('#alertEvents');if(d.recent&&d.recent.length){ev.className='ls-code';ev.style.minHeight='160px';ev.textContent=d.recent.map(function(x){return typeof x==='string'?x:JSON.stringify(x);}).join('\n');}else{ev.className='ls-note';ev.textContent='暂无事件';}
+    }catch(e){flash(String(e.message),true);}
+  }
+  async function loadHistory(){
+    try{var d=await api('/api/config/history');var box=q('#historyRows');box.innerHTML='';
+      if(!d.items.length){box.innerHTML='<div class="ls-note">尚未生成快照</div>';return;}
+      d.items.forEach(function(it){
+        var r=ce('div');r.className='ls-list-row';
+        r.innerHTML='<span>'+esc(it.created_at)+'</span><span><span class="ls-badge">'+esc(it.reason)+'</span></span><span class="ls-muted">'+esc(it.size)+' B</span>';
+        var ops=ce('div');ops.className='ls-row';
+        var b1=ce('button');b1.className='ls-btn';b1.textContent='查看';b1.onclick=function(){api('/api/config/snapshot?id='+encodeURIComponent(it.id)).then(function(s){q('#configText').value=s.config_text||'';go('config');flash('已载入快照到编辑器，未写入配置');}).catch(function(e){flash(e.message,true);});};
+        var b2=ce('button');b2.className='ls-btn danger';b2.textContent='回滚';b2.onclick=function(){if(!confirm('确认回滚到 '+it.created_at+' ？'))return;api('/api/config/rollback',{method:'POST',write:true,body:JSON.stringify({id:it.id})}).then(function(){flash('回滚成功');loadHistory();}).catch(function(e){flash(e.message,true);});};
+        ops.appendChild(b1);ops.appendChild(b2);r.appendChild(ops);box.appendChild(r);
+      });
+    }catch(e){flash(String(e.message),true);}
+  }
+  function load(k){if(k==='overview')loadStatus();if(k==='config')loadConfig();if(k==='observe'){loadMetrics();loadLogs();}if(k==='logs')loadLogs();if(k==='alerts')loadAlerts();if(k==='history')loadHistory();}
+  q('#refreshBtn').onclick=function(){load(state.page);flash('已刷新');};
+  q('#logRefresh').onclick=loadLogs;q('#logLevel').onchange=loadLogs;q('#historyRefresh').onclick=loadHistory;
+  q('#themeBtn').onclick=function(){var now=document.documentElement.getAttribute('theme')==='dark'?'light':'dark';document.documentElement.setAttribute('theme',now);try{localStorage.setItem('ls-theme',now);}catch(e){}};
+  try{var saved=localStorage.getItem('ls-theme');if(saved)document.documentElement.setAttribute('theme',saved);}catch(e){}
+  q('#saveBtn').onclick=function(){api('/api/config',{method:'POST',write:true,body:JSON.stringify({text:q('#configText').value})}).then(function(){flash('配置已保存并热重载');loadHistory();}).catch(function(e){flash(e.message,true);});};
+  q('#reloadBtn').onclick=function(){api('/api/reload',{method:'POST',write:true,body:'{}'}).then(function(){flash('已重新载入');}).catch(function(e){flash(e.message,true);});};
+  q('#exportBtn').onclick=function(){api('/api/config/snapshot?reason=manual').then(function(s){var blob=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});var a=ce('a');a.href=URL.createObjectURL(blob);a.download=state.component+'-snapshot.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);flash('快照已导出（不含凭据）');}).catch(function(e){flash(e.message,true);});};
+  q('#importFile').onchange=function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){api('/api/config/snapshot',{method:'POST',write:true,body:String(rd.result)}).then(function(){flash('快照已导入');loadConfig();loadHistory();}).catch(function(x){flash(x.message,true);});};rd.readAsText(f);e.target.value='';};
+  renderNav();go('overview');setInterval(function(){if(state.page==='overview')loadStatus();},5000);
+})();
+</script>
+</body>
+</html>

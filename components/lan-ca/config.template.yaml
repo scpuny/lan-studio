@@ -1,0 +1,40 @@
+version: 1
+component: lan-ca
+
+server:
+  listen: "127.0.0.1"
+  port: 8082
+  webui: true
+  admin_token: ""
+  log_level: info
+
+observability:
+  metrics: true
+  alerts: true
+  history_limit: 30
+
+logging:
+  max_bytes: 1048576
+  backup_count: 3
+  level: info
+
+alerts:
+  enabled: true
+  webhooks: []
+  cooldown_seconds: 300
+  timeout_seconds: 5.0
+  max_retries: 2
+
+# --- lan-ca business configuration (PRD 4.4 / D8: single self-signed root) ---
+ca:
+  default_days: 90
+  max_days: 3650
+  # Only internal names may be issued; empty = no suffix restriction.
+  allowed_suffixes:
+    - ".lan"
+    - ".internal"
+    - ".local"
+  max_certificates: 1000
+  # Root key is stored separately, never in logs, snapshots or exports.
+  root_key_path: "lan-ca.root.key"
+  store_path: "lan-ca.store.json"

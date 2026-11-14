@@ -1,12 +1,9 @@
 <template>
   <a-config-provider size="large">
     <div class="ls-app">
-    <div class="ls-aurora"></div>
-    <div class="ls-grain"></div>
-
     <aside class="ls-rail">
       <div class="ls-brand">
-        <div class="ls-brand-mark" v-html="brandMark"></div>
+        <div class="ls-brand-mark"><Icon name="broadcast" :size="19" /></div>
         <div>
           <div class="ls-brand-name">Lan Studio</div>
           <div class="ls-brand-sub">Multicast Console</div>
@@ -23,7 +20,7 @@
           type="button"
           @click="activeKey = item.key"
         >
-          <span class="ls-nav-ico" v-html="navIcon(item.icon)"></span>
+          <Icon :name="item.icon" />
           <span>{{ item.label }}</span>
         </button>
       </nav>
@@ -63,9 +60,10 @@
             <span>{{ status.running ? '已连接' : '未连接' }}</span>
           </span>
           <button class="ls-icon-btn" :title="dark ? '切换浅色' : '切换深色'" @click="toggleTheme">
-            <span v-html="dark ? iconSun : iconMoon"></span>
+            <Icon :name="dark ? 'sun' : 'moon'" />
           </button>
           <a-button size="small" @click="openAuth">
+            <Icon name="lock" :size="14" />
             {{ session.password ? '已解锁' : '管理员' }}
           </a-button>
         </div>
@@ -175,6 +173,7 @@ import type { PasswordResult, StatusData, VerifyResult } from './types'
 import AlertsPage from './pages/AlertsPage.vue'
 import ConfigPage from './pages/ConfigPage.vue'
 import HistoryPage from './pages/HistoryPage.vue'
+import Icon from './Icon.vue'
 import LogsPage from './pages/LogsPage.vue'
 import ObservePage from './pages/ObservePage.vue'
 import OverviewPage from './pages/OverviewPage.vue'
@@ -246,27 +245,6 @@ const navItems: NavItem[] = [
     sub: '配置快照与回滚',
   },
 ]
-
-const ICONS: Record<string, string> = {
-  grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
-  sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
-  activity: '<path d="M3 12h4l2.5 7L14 4l2.5 8H21"/>',
-  terminal: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M12.5 15h4.5"/>',
-  bell: '<path d="M18 9a6 6 0 0 0-12 0c0 5-2 6-2 6h16s-2-1-2-6M10 20a2 2 0 0 0 4 0"/>',
-  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3.5 2"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-  moon: '<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/>',
-  broadcast:
-    '<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13"/>',
-}
-
-const svg = (inner: string): string =>
-  `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`
-
-const navIcon = (name: string): string => svg(ICONS[name] || '')
-const iconSun = svg(ICONS.sun ?? '')
-const iconMoon = svg(ICONS.moon ?? '')
-const brandMark = svg(ICONS.broadcast ?? '')
 
 const activeKey = ref('overview')
 const banner = ref('')

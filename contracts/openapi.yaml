@@ -27,7 +27,7 @@ tags:
   - name: auth
     description: Authentication state and password management
   - name: component
-    description: lan-mdns specific endpoints
+    description: Component-specific endpoints (lan-mdns / M3 relay, ca, scan)
 
 paths:
   /healthz:
@@ -417,6 +417,199 @@ paths:
       responses:
         "200":
           description: Conflicts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+  # --- M3: lan-relay (PRD 4.3) ---
+  /api/relay/stats:
+    get:
+      tags: [component]
+      summary: lan-relay loop-guard configuration and counters
+      responses:
+        "200":
+          description: Loop guard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/relay/interfaces:
+    get:
+      tags: [component]
+      summary: lan-relay logical and physical interfaces
+      responses:
+        "200":
+          description: Interfaces
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/relay/inject:
+    post:
+      tags: [component]
+      summary: Deterministically inject a packet into the loop guard (acceptance hook)
+      responses:
+        "200":
+          description: Verdict and counters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/relay/mark-local:
+    post:
+      tags: [component]
+      summary: Register a locally generated packet so it is never relayed
+      responses:
+        "200":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+  # --- M3: lan-ca (PRD 4.4) ---
+  /api/ca/root:
+    get:
+      tags: [component]
+      summary: Root fingerprint and trust model (never returns the key)
+      responses:
+        "200":
+          description: Root info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/certificates:
+    get:
+      tags: [component]
+      summary: Certificate inventory
+      responses:
+        "200":
+          description: Certificates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/crl:
+    get:
+      tags: [component]
+      summary: Certificate revocation list
+      responses:
+        "200":
+          description: CRL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/audit:
+    get:
+      tags: [component]
+      summary: Issue / renew / revoke audit trail
+      responses:
+        "200":
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/export:
+    get:
+      tags: [component]
+      summary: Safe export of certificates and audit (no root key)
+      responses:
+        "200":
+          description: Export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/issue:
+    post:
+      tags: [component]
+      summary: Issue a certificate for an internal name
+      responses:
+        "200":
+          description: Certificate and PEM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/renew:
+    post:
+      tags: [component]
+      summary: Renew (re-sign) an active certificate
+      responses:
+        "200":
+          description: Renewed certificate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/revoke:
+    post:
+      tags: [component]
+      summary: Revoke a certificate with a reason
+      responses:
+        "200":
+          description: Revoked certificate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ca/verify:
+    post:
+      tags: [component]
+      summary: Verify a certificate signature against the root
+      responses:
+        "200":
+          description: Validity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+  # --- M3: lan-scan (PRD 4.5) ---
+  /api/scan/status:
+    get:
+      tags: [component]
+      summary: Scan progress, last run and configured ceilings
+      responses:
+        "200":
+          description: Scan status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/scan/results:
+    get:
+      tags: [component]
+      summary: Bounded discovery results
+      responses:
+        "200":
+          description: Results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/scan/snapshot:
+    get:
+      tags: [component]
+      summary: Self-contained results snapshot
+      responses:
+        "200":
+          description: Snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/scan/start:
+    post:
+      tags: [component]
+      summary: Start a bounded read-only scan of a CIDR segment
+      responses:
+        "200":
+          description: Started
           content:
             application/json:
               schema:

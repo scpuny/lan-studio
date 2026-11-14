@@ -2,6 +2,7 @@
   <div>
     <div class="ls-panel">
       <div class="ls-panel-title">
+        <Icon name="bell" />
         告警通道
         <span class="ls-hint">本地判定 + Webhook 推送，不依赖外部服务</span>
         <div class="ls-header-spacer"></div>
@@ -10,37 +11,45 @@
 
       <a-alert v-if="error" type="error">{{ error }}</a-alert>
 
-      <div class="ls-grid" style="margin-bottom: 14px">
-        <div class="ls-metric-card">
-          <div class="ls-kpi-label">状态</div>
-          <div class="ls-inline">
-            <span class="ls-dot" :class="status.enabled ? 'is-up' : 'is-unknown'"></span>
-            <span class="ls-kpi-value small">{{ status.enabled ? '已启用' : '未启用' }}</span>
+      <div class="ls-grid ls-grid--alerts" style="margin-bottom: 14px">
+        <div class="ls-metric-card has-tone tone-purple">
+          <span class="ls-metric-ico"><Icon name="bell" :size="22" /></span>
+          <div class="ls-metric-body">
+            <div class="ls-kpi-label">
+              <span class="ls-dot" :class="status.enabled ? 'is-up' : 'is-unknown'"></span>状态
+            </div>
+            <div class="ls-kpi-value small">{{ status.enabled ? '已启用' : '未启用' }}</div>
           </div>
-          <div class="ls-kpi-foot">{{ status.webhooks }} 个 Webhook</div>
         </div>
-        <div class="ls-metric-card">
-          <div class="ls-kpi-label">队列</div>
-          <div class="ls-kpi-value">
-            {{ status.queued
-            }}<span class="ls-muted" style="font-size: 13px"> / {{ status.queue_capacity }}</span>
+        <div class="ls-metric-card has-tone tone-blue">
+          <span class="ls-metric-ico"><Icon name="layers" :size="22" /></span>
+          <div class="ls-metric-body">
+            <div class="ls-kpi-label">队列<span class="ls-muted"> · {{ status.webhooks }} 个 Webhook</span></div>
+            <div class="ls-kpi-value">
+              {{ status.queued }}<span class="ls-muted" style="font-size: 13px"> / {{ status.queue_capacity }}</span>
+            </div>
           </div>
-          <div class="ls-kpi-foot">有界队列，满则丢弃并计数</div>
         </div>
-        <div class="ls-metric-card">
-          <div class="ls-kpi-label">已发送</div>
-          <div class="ls-kpi-value">{{ status.sent }}</div>
-          <div class="ls-kpi-foot">失败 {{ status.failed }} · 丢弃 {{ status.dropped }}</div>
+        <div class="ls-metric-card has-tone tone-green">
+          <span class="ls-metric-ico"><Icon name="send" :size="22" /></span>
+          <div class="ls-metric-body">
+            <div class="ls-kpi-label">已发送<span class="ls-muted"> · 失败 {{ status.failed }} · 丢弃 {{ status.dropped }}</span></div>
+            <div class="ls-kpi-value">{{ status.sent }}</div>
+          </div>
         </div>
-        <div class="ls-metric-card">
-          <div class="ls-kpi-label">冷却抑制</div>
-          <div class="ls-kpi-value">{{ status.suppressed }}</div>
-          <div class="ls-kpi-foot">窗口 {{ status.cooldown_seconds }} 秒</div>
+        <div class="ls-metric-card has-tone tone-cyan">
+          <span class="ls-metric-ico"><Icon name="timer" :size="22" /></span>
+          <div class="ls-metric-body">
+            <div class="ls-kpi-label">冷却抑制<span class="ls-muted"> · 窗口 {{ status.cooldown_seconds }} 秒</span></div>
+            <div class="ls-kpi-value">{{ status.suppressed }}</div>
+          </div>
         </div>
-        <div class="ls-metric-card">
-          <div class="ls-kpi-label">重试次数</div>
-          <div class="ls-kpi-value">{{ status.retries }}</div>
-          <div class="ls-kpi-foot">单事件最多重试 2 次</div>
+        <div class="ls-metric-card has-tone tone-indigo">
+          <span class="ls-metric-ico"><Icon name="refresh" :size="22" /></span>
+          <div class="ls-metric-body">
+            <div class="ls-kpi-label">重试次数</div>
+            <div class="ls-kpi-value">{{ status.retries }}</div>
+          </div>
         </div>
       </div>
 
@@ -67,27 +76,36 @@
         </a-tab-pane>
 
         <a-tab-pane key="gateway" title="网关状态">
-          <div class="ls-grid">
-            <div class="ls-metric-card">
-              <div class="ls-kpi-label">网关</div>
-              <div class="ls-inline">
-                <span class="ls-dot" :class="status.gateway.enabled ? 'is-up' : 'is-unknown'"></span>
-                <span class="ls-kpi-value small">{{ status.gateway.enabled ? '已开启' : '已关闭' }}</span>
+          <div class="ls-grid ls-grid--gw">
+            <div class="ls-metric-card has-tone tone-cyan">
+              <span class="ls-metric-ico"><Icon name="globe" :size="22" /></span>
+              <div class="ls-metric-body">
+                <div class="ls-kpi-label">
+                  <span class="ls-dot" :class="status.gateway.enabled ? 'is-up' : 'is-unknown'"></span>网关
+                </div>
+                <div class="ls-kpi-value small">{{ status.gateway.enabled ? '已开启' : '已关闭' }}</div>
               </div>
-              <div class="ls-kpi-foot">{{ status.gateway.routes }} 条静态路由</div>
             </div>
-            <div class="ls-metric-card">
-              <div class="ls-kpi-label">请求</div>
-              <div class="ls-kpi-value">{{ status.gateway.requests }}</div>
+            <div class="ls-metric-card has-tone tone-blue">
+              <span class="ls-metric-ico"><Icon name="arrowRight" :size="22" /></span>
+              <div class="ls-metric-body">
+                <div class="ls-kpi-label">请求</div>
+                <div class="ls-kpi-value">{{ status.gateway.requests }}</div>
+              </div>
             </div>
-            <div class="ls-metric-card">
-              <div class="ls-kpi-label">已转发</div>
-              <div class="ls-kpi-value">{{ status.gateway.forwarded }}</div>
+            <div class="ls-metric-card has-tone tone-green">
+              <span class="ls-metric-ico"><Icon name="check" :size="22" /></span>
+              <div class="ls-metric-body">
+                <div class="ls-kpi-label">已转发</div>
+                <div class="ls-kpi-value">{{ status.gateway.forwarded }}</div>
+              </div>
             </div>
-            <div class="ls-metric-card">
-              <div class="ls-kpi-label">不可达</div>
-              <div class="ls-kpi-value">{{ status.gateway.unreachable }}</div>
-              <div class="ls-kpi-foot">触发 gateway_target_unreachable 告警</div>
+            <div class="ls-metric-card has-tone tone-amber">
+              <span class="ls-metric-ico"><Icon name="alert" :size="22" /></span>
+              <div class="ls-metric-body">
+                <div class="ls-kpi-label">不可达<span class="ls-muted"> · 触发 gateway_target_unreachable</span></div>
+                <div class="ls-kpi-value">{{ status.gateway.unreachable }}</div>
+              </div>
             </div>
           </div>
         </a-tab-pane>
@@ -119,6 +137,7 @@
 import { computed, reactive, ref } from 'vue'
 import type { TableColumnData } from '@arco-design/web-vue'
 import { errorMessage, get } from '../api'
+import Icon from '../Icon.vue'
 import { emptyAlertStatus } from '../defaults'
 import { usePolling } from '../poll'
 import type { AlertKindCount, AlertStatus } from '../types'

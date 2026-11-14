@@ -24,6 +24,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-component"
+version = "0.1.0"
+dependencies = [
+ "common-alert",
+ "common-api",
+ "common-auth",
+ "common-config",
+ "common-crypto",
+ "common-health",
+ "common-log",
+ "common-metrics",
+]
+
+[[package]]
 name = "common-config"
 version = "0.1.0"
 
@@ -56,6 +70,17 @@ name = "common-webui"
 version = "0.1.0"
 
 [[package]]
+name = "lan-ca"
+version = "0.1.0"
+dependencies = [
+ "common-api",
+ "common-component",
+ "common-config",
+ "common-crypto",
+ "common-metrics",
+]
+
+[[package]]
 name = "lan-mdns"
 version = "0.1.0"
 dependencies = [
@@ -70,4 +95,27 @@ dependencies = [
  "common-metrics",
  "common-net",
  "common-webui",
+]
+
+[[package]]
+name = "lan-relay"
+version = "0.1.0"
+dependencies = [
+ "common-api",
+ "common-component",
+ "common-config",
+ "common-crypto",
+ "common-metrics",
+ "common-net",
+]
+
+[[package]]
+name = "lan-scan"
+version = "0.1.0"
+dependencies = [
+ "common-alert",
+ "common-api",
+ "common-component",
+ "common-config",
+ "common-metrics",
 ]

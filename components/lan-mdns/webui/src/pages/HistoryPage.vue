@@ -2,6 +2,7 @@
   <div>
     <div class="ls-panel">
       <div class="ls-panel-title">
+        <Icon name="history" />
         版本历史
         <span class="ls-hint">每次保存前自动写入快照；回滚同样先备份当前配置</span>
         <div class="ls-header-spacer"></div>
@@ -74,6 +75,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Message, Modal } from '@arco-design/web-vue'
+import Icon from '../Icon.vue'
 import type { TableColumnData } from '@arco-design/web-vue'
 import { errorMessage, get, isAuthError, post } from '../api'
 import { formatBytes, formatDate } from '../poll'
