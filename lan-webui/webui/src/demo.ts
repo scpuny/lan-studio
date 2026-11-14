@@ -486,6 +486,10 @@ const DEMO_ROUTES: DemoRoute[] = [
 
 function patchFetch(): void {
   const realFetch = window.fetch.bind(window)
+  // The unified console routes every component call through the same-origin
+  // proxy at `/p/<component>/api/...`; strip the prefix so the demo route table
+  // (keyed by plain `/api/...`) still matches.
+  const stripProxy = (raw: string): string => raw.replace(/^\/p\/[^/]+/, '')
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url =
       typeof input === 'string'
@@ -494,7 +498,7 @@ function patchFetch(): void {
           ? input.toString()
           : (input as Request).url
     const method = (init?.method ?? 'GET').toString().toUpperCase()
-    const route = DEMO_ROUTES.find((r) => r.method === method && r.match(url))
+    const route = DEMO_ROUTES.find((r) => r.method === method && r.match(stripProxy(url)))
     if (!route) return realFetch(input, init)
 
     if (route.text) {

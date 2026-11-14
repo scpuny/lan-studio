@@ -1,9 +1,9 @@
 # Lan Studio
 
 > 内网轻量 ZeroConf 与局域网运维工具箱。
-> 8 个 `lan-*` 组件，统一契约、独立二进制、独立 WebUI、可单独部署。
+> 8 个 `lan-*` 组件，统一契约、独立二进制、独立部署；外加聚合层 `lan-webui`（前后端一体的统一控制台，非第 9 个组件）与只读兼容的 `lan-shell`。
 
-**当前状态：M5 完成 + M6 前端聚合已落地 —— 8 个 `lan-*` 组件 + 统一控制台，PRD §8.2 生态级 DoD 六条通过**（2026-11-14）。M5 是 PRD §7.5 定义的最后一个里程碑，M0~M5 全部销项；M6 是不改变规格里程碑的工程演进项，见 [`docs/M6-CHECKLIST.md`](docs/M6-CHECKLIST.md)。
+**当前状态：M5 完成 + M6 前端聚合 + M7 统一控制台 `lan-webui` 已落地 —— 8 个 `lan-*` 组件 + 自包含统一控制台，PRD §8.2 生态级 DoD 六条通过**（2026-11-14）。M5 是 PRD §7.5 定义的最后一个里程碑，M0~M5 全部销项；M6 / M7 是不改变规格里程碑的工程演进，见 [`docs/M6-CHECKLIST.md`](docs/M6-CHECKLIST.md) / [`docs/M7-CHECKLIST.md`](docs/M7-CHECKLIST.md)。
 
 M2 管理台为 **Vue 3 + TypeScript + Arco Design** 六区域控制台，打包成单个自包含 HTML
 编入二进制；66 条功能逐条销项，运行态契约 75/0、冒烟 229 项，见
@@ -36,7 +36,7 @@ Shell 在 M6 升级为**单文件统一 SPA**：导航、面板与控件由能�
 
 ```
 lan-studio/
-├── Cargo.toml             # workspace，22 个 member
+├── Cargo.toml             # workspace，23 个 member
 ├── docs/                  # 规格与字典
 │   ├── PRD.md             # 唯一权威规格书
 │   ├── M2-CHECKLIST.md    # 66 条功能逐条销项基线
@@ -44,9 +44,9 @@ lan-studio/
 │   ├── M4-PLAN.md / M4-CHECKLIST.md    # P1 方案与销项
 │   ├── M5-PLAN.md / M5-CHECKLIST.md    # P2 + 统一出口方案与生态销项
 │   ├── M6-PLAN.md / M6-CHECKLIST.md  # 前端聚合方案与销项
-│   ├── M7-PLAN.md                # lan-webui 前后端一体方案
+│   ├── M7-PLAN.md / M7-CHECKLIST.md  # lan-webui 前后端一体统一控制台
 │   ├── METRICS.md  ALERT-SCHEMA.md  ERROR-CODES.md
-│   └── ADR/               # 0001 M1 … 0007 M5 生态收敛 / 0008 M6 前端聚合
+│   └── ADR/               # 0001 M1 … 0007 M5 生态收敛 / 0008 M6 前端聚合 / 0009 M7 lan-webui
 ├── contracts/             # 机器可读契约（语言无关）
 │   ├── openapi.yaml  config.schema.json  alert-event.json
 │   ├── log-record.json  snapshot.json  service-record.json
@@ -54,10 +54,10 @@ lan-studio/
 │   └── examples/          # 通过 schema 的示例（含 capabilities.*.sample.json × 8）
 ├── scripts/
 │   ├── verify_contracts.py   # 静态契约校验（文档彼此自洽）
-│   ├── gen_capabilities.py   # M6：从后端 .route() 派生能力清单与代理白名单
+│   ├── gen_capabilities.py   # M6/M7：从后端 .route() 派生能力清单与代理白名单；--aggregate 合成 lan-webui 清单；--check 校验漂移
 │   ├── test_api_contract.py  # 运行态契约门禁（比对 openapi 与真实响应）
 │   ├── smoke_mdns.py         # 运行态冒烟（229 项断言）
-│   ├── test_m3.py / test_m4.py / test_m5.py / test_m6.py  # 各里程碑运行态验收
+│   ├── test_m3.py / test_m4.py / test_m5.py / test_m6.py / test_m7.py  # 各里程碑运行态验收
 │   ├── test_ecosystem.py     # PRD §8.2 生态级 DoD 六条
 │   └── install.sh          # 一键安装 / --upgrade（保留配置与凭据）
 ├── common/                # 公共 crate
@@ -66,7 +66,7 @@ lan-studio/
 │   ├── component/         # M3 共享运行时；M6 能力清单 + console-renderer.js
 │   └── probe/             # M4 只读 TCP 探测 + 去抖状态机
 ├── components/            # 8 个组件（端口 8080 ~ 8087）
-│   ├── lan-mdns/          # 真实引擎 + 网关 + 配置模板 + Vue 3 / Arco 控制台
+│   ├── lan-mdns/          # 真实引擎 + 网关 + 配置模板 + Vue 3 / Arco 控制台源码（已迁至 lan-webui/webui，产物共用）
 │   ├── lan-relay/         # 跨网段 mDNS 中继 + 4 项环路检测
 │   ├── lan-ca/            # 内网轻量证书签发 / 续期 / 吊销 / 审计
 │   ├── lan-scan/          # 只读资产与端口探查（速率 / 并发有硬上界）
@@ -76,12 +76,19 @@ lan-studio/
 │   └── lan-ssdp/          # 只读 SSDP 发现，输出统一服务记录
 ├── deploy/
 │   ├── Dockerfile  docker-compose.yml  lan-mdns.service
-├── shell/                 # 统一出口（聚合层，非组件）
+├── lan-webui/             # ★ 统一控制台（聚合层，非第 9 个组件）：前后端一体
+│   ├── Cargo.toml         # package lan-webui（Rust BFF）
+│   ├── modules.yaml       # 后端声明：启用哪些组件 / libs / 端口（前端可见性唯一开关）
+│   ├── capabilities.json  # --aggregate 合成清单（identity=lan-webui），编译期注入前端
+│   ├── capabilities.allowlist.txt  # --aggregate 合成代理白名单
+│   ├── src/               # Rust 后端：main.rs / capabilities.rs / proxy.rs
+│   └── webui/             # Vue 3 + TS + Arco 前端（自 components/lan-mdns/webui git mv），单文件产物编入二进制
+├── shell/                 # 统一出口历史实现（M7 起只读兼容，不再作为主入口发布）
 │   ├── components.yaml    # 8 组件静态 manifest + 各自的 modules 声明
 │   └── src/assets/shell.html  # M6 单文件统一 SPA，零外部资源
 └── .github/workflows/
     ├── ci.yml             # 契约 + fmt/clippy/test + 全里程碑回归 + 生态 DoD
-    └── release.yml        # 8 组件 + Shell × amd64/arm64 musl + SHA256SUMS
+    └── release.yml        # 8 组件 + lan-webui × amd64/arm64 musl + SHA256SUMS
 ```
 
 ## 契约校验
@@ -117,8 +124,8 @@ cargo build --workspace
 python3 scripts/verify_contracts.py
 python3 scripts/gen_capabilities.py --check
 python3 scripts/test_m3.py && python3 scripts/test_m4.py
-python3 scripts/test_m5.py && python3 scripts/test_m6.py && python3 scripts/test_ecosystem.py
-cargo build --release -p lan-mdns
+python3 scripts/test_m5.py && python3 scripts/test_m6.py && python3 scripts/test_m7.py && python3 scripts/test_ecosystem.py
+cargo build --release -p lan-mdns -p lan-webui
 
 LAN_STUDIO_PORT=8080 \
 LAN_STUDIO_CONFIG=components/lan-mdns/config.template.yaml \
@@ -144,19 +151,22 @@ curl --noproxy '*' -X POST -H 'Content-Type: application/json' \
 
 ### 管理台（前端）
 
-管理台源码在 `components/lan-mdns/webui/`，Vue 3 + **TypeScript（strict）** + Arco
-Design，由 Vite 打成单个 HTML 后再编入二进制。**该前端目录内没有 `.js` 源文件**（M6 聚合壳的共享渲染器是另一套，见下）。
+前端源码在 `lan-webui/webui/`（自 `components/lan-mdns/webui/` 经 `git mv` 迁出），Vue 3 +
+**TypeScript（strict）** + Arco Design，由 Vite 打成单个 HTML 后再编入二进制；该单文件产物
+落在 `common/webui/src/assets/index.html`，**`lan-mdns` 与 `lan-webui` 两个二进制共用同一份**。
+前端是能力清单驱动的全集渲染器（见下「统一控制台」），目录内没有 `.js` 源文件。
 
 ```bash
-cd components/lan-mdns/webui
+cd lan-webui/webui
 npm ci
 npm run typecheck   # vue-tsc --noEmit，类型门禁
 npm run build       # typecheck + build → common/webui/src/assets/index.html
+npm run verify      # typecheck + build + 离线 render-check（DOM 断言，RENDER OK）
 ```
 
-改动前端后必须重新构建并一起提交，否则二进制里仍是旧页面；CI 的 `webui` job 会跑
-`typecheck` 并对产物断言「无外部资源」。详见
-[`components/lan-mdns/webui/README.md`](components/lan-mdns/webui/README.md)。
+改动前端后必须重新构建并一起提交，否则两个二进制里仍是旧页面；CI 的 `webui` job 会跑
+`typecheck` + `render-check` 并对产物断言「无外部资源」。详见
+[`lan-webui/webui/README.md`](lan-webui/webui/README.md)。
 
 **写操作受管理员密码保护**（F-F02~F-F04）。首次未设置密码时所有写路由返回
 `409 setup_required`；先设置密码，再在请求头带 `X-Admin-Password`：
@@ -178,25 +188,32 @@ curl --noproxy '*' -X POST -H 'X-Admin-Password: change-me-now' \
 | `LAN_STUDIO_PORT` | `server.port`（8080） | 测试 / CI 端口覆盖钩子，生产以 YAML 为准 |
 | `LAN_MDNS_GATEWAY_PORT` | `mdns.gateway.port`（80） | 仅测试隔离用：覆盖网关监听端口 |
 
-### 统一控制台（M6 前端聚合）
+### 统一控制台（M7：lan-webui 前后端一体）
 
-8 个组件与 `lan-shell` 共用 `common/component/src/assets/console-renderer.js`；页面元素由
-编译期生成的能力清单决定：`scripts/gen_capabilities.py` 反向扫描各组件 `.route()` /
-`.route_write()`，产出 `contracts/examples/capabilities.<name>.sample.json` × 8 与
-`contracts/capabilities.allowlist.txt`。未被后端引用（或 `requires_lib` 不满足）的模块
-**不生成 DOM**，不是隐藏或置灰；清单与后端注册路径漂移时 CI 直接失败：
+**`lan-webui` 是自包含的统一控制台**：同一个目录下既有 Vue 3 / TS / Arco 前端（`lan-webui/webui/`），
+也有自己的 Rust 后端 BFF（`lan-webui/src/`），默认端口 **8090**。它不是第 9 个 `lan-*` 组件，
+而是聚合层——8 个组件仍独立进程、独立部署，业务数据经 `lan-webui` 的有界同源代理拉取。
+
+「**后端控制前端显示哪些模块**」由 `lan-webui/modules.yaml` 的 `enabled_components` 唯一决定：
+`scripts/gen_capabilities.py --aggregate` 据此合成 `lan-webui/capabilities.json`（聚合清单，
+identity=`lan-webui`）+ `lan-webui/capabilities.allowlist.txt`（代理白名单），编译期注入前端。
+前端 `capabilities.ts` 只渲染清单声明的组件 / 模块 / 面板 / 控件，**未声明模块不产生 DOM**；
+8 类通用 widget（`kv-grid` / `table` / `form` / `code-editor` / `metric-grid` / `log-list` /
+`text-view` / `action-list`）按 `panel.widget` 分派。清单与 `modules.yaml` / 后端 `.route()`
+漂移时 CI 直接失败：
 
 ```bash
 python3 scripts/gen_capabilities.py --check
-python3 scripts/test_m6.py   # 能力驱动渲染 + 有界同源代理运行态门禁
+python3 scripts/test_m7.py   # 聚合==声明、代理白名单有界、能力驱动渲染运行态门禁
 ```
 
-Shell 的 `GET|POST /p/<name>/api/...` 是同源白名单代理：组件 + 端点双层白名单，目标恒为
+`lan-webui` 的 `GET|POST /p/<name>/api/...` 是同源白名单代理：组件 + 端点双层白名单，目标恒为
 `127.0.0.1:<manifest port>`，5s 超时、1 MiB 响应上界、不跟随重定向、不缓存凭据；只转发
-`X-Admin-Password` / `X-Admin-Token`，不代管密码。`lan-mdns` 的 Arco 单文件控制台是刻意
-保留的例外，在聚合页中以 iframe 直连组件端口挂载。详见
-[`docs/M6-PLAN.md`](docs/M6-PLAN.md)、[`docs/M6-CHECKLIST.md`](docs/M6-CHECKLIST.md) 与
-[`docs/ADR/0008-m6-frontend-aggregation.md`](docs/ADR/0008-m6-frontend-aggregation.md)。
+`X-Admin-Password` / `X-Admin-Token`，DOM 中无 `type="password"` 输入框，不代管密码。
+`lan-shell`（M6 的聚合壳）保留为**只读兼容入口**，源码与门禁脚本仍在仓库、`cargo build --workspace`
+仍产出其二进制，但 `release.yml` 不再将其作为统一出口发布。详见
+[`docs/M7-PLAN.md`](docs/M7-PLAN.md)、[`docs/M7-CHECKLIST.md`](docs/M7-CHECKLIST.md) 与
+[`docs/ADR/0009-m7-lan-webui.md`](docs/ADR/0009-m7-lan-webui.md)（含对 ADR 0008 的收敛说明）。
 
 ## 告警与内置网关
 
@@ -279,8 +296,9 @@ python3 scripts/test_api_contract.py
 | M4 | P1：`lan-hosts` / `lan-wol` | **完成（无重叠 5/5）** | [`docs/M4-CHECKLIST.md`](docs/M4-CHECKLIST.md)，`test_m4.py` 76/76，提交 `2b5b259` |
 | M5 | P2：`lan-sync` / `lan-ssdp` + 统一出口 + 生态 DoD | **完成（生态六条全绿）** | [`docs/M5-CHECKLIST.md`](docs/M5-CHECKLIST.md)，`test_m5.py` 与 `test_ecosystem.py` 各 91/0，提交 `9a9c4de` |
 | M6（工程演进） | 前端聚合：能力清单驱动渲染 + Shell 同源白名单代理 | **已落地** | [`docs/M6-CHECKLIST.md`](docs/M6-CHECKLIST.md)，`test_m6.py` 152/0、单测 201 passed |
+| M7（工程演进） | 统一控制台 `lan-webui`：前后端一体，后端声明控制前端可见模块 | **已落地** | [`docs/M7-CHECKLIST.md`](docs/M7-CHECKLIST.md)，`test_m7.py` 通过、单测 208 passed、10 个二进制、`npm run verify` RENDER OK |
 
-全量门禁逐项数字以 [`docs/M6-CHECKLIST.md`](docs/M6-CHECKLIST.md) 第 9 节为准（fmt 0 diff、clippy 0 warning、单测 201 passed、静态契约 34/0、能力清单 8/8、M6 运行态 152/0、9 个二进制）。PRD §7.5 在 M5 之后没有后续阶段，M6 是不改变规格里程碑的工程演进项；剩余边界（`install.sh` 只安装 `lan-mdns`、macOS 上 `smoke_mdns.py` 的环境性失败、M2 Arco iframe 直连组件端口）登记在 ADR 0007 / 0008，不计入里程碑状态。
+全量门禁逐项数字以 [`docs/M7-CHECKLIST.md`](docs/M7-CHECKLIST.md) 第 9 节为准（fmt 0 diff、clippy 0 warning、单测 208 passed、静态契约 34/0、能力清单 8/8、`test_m7.py` 通过、M2~M6 与生态运行态全绿、`cargo build --workspace` 10 个二进制）。PRD §7.5 在 M5 之后没有后续阶段，M6 / M7 是不改变规格里程碑的工程演进项；剩余边界（`install.sh` 仍只安装 `lan-mdns`、`lan-shell` 只读兼容不发布、macOS 上 `smoke_mdns.py` 的环境性失败）登记在 ADR 0007 / 0008 / 0009，不计入里程碑状态。
 
 ## 说明
 
@@ -301,24 +319,23 @@ python3 scripts/test_api_contract.py
   `lan-scan`。
 - `LAN_MDNS_GROUP` / `LAN_MDNS_PORT` / `LAN_MDNS_GATEWAY_PORT` 仅用于测试隔离；
   生产组播地址、mDNS 端口与网关端口永远取自 YAML。
-- M5 两组件默认端口 8086 / 8087，统一出口 `lan-shell` 默认 8090；`lan-sync` 只调用
+- M5 两组件默认端口 8086 / 8087；`lan-sync` 只调用
   标准契约端点 `/api/config/snapshot`，冲突策略默认 `reject` 且每次决策写有界审计；
   `lan-ssdp` 只读发现，不抓 LOCATION 描述、不调 SOAP / 控制接口，运行态验收用回环
   单播 fake 设备，不向真实 LAN 发组播。
 - 统一服务记录模型 `contracts/service-record.json` 由 `lan-ssdp` 与 `lan-mdns` 的
   `/api/browse/unified` 共同输出；旧的 `/api/browse` 响应形状保持不变。
-- `lan-shell` 是聚合层，**不计入 8 个组件**：没有 18 个统一端点；M6 起只提供**同源白名单
-  代理** `/p/<name>/api/...`（组件 + 端点双层白名单、有界超时与响应体），不代管管理员
-  密码，只转发 `X-Admin-Password` / `X-Admin-Token`；`scripts/install.sh` 仍只安装
-  `lan-mdns`，其余二进制由 `release.yml` 的 8×2 产物矩阵分发（登记在 ADR 0007 / 0008）。
-- 前端两套壳（M2 的 Arco 单文件控制台与其余组件的原生 JS 六区域控制台）在 M5 有意
-  并存；M6 已通过统一 SPA + 共享渲染器完成聚合，M2 Arco 页作为刻意例外由 iframe 挂载，
-  PRD §3.7 偏差的收敛范围见 ADR 0008。
+- 统一控制台**默认端口 8090**：M6 由 `lan-shell` 承担（同源白名单代理），**M7 起改由 `lan-webui` 承担**——它前后端一体，后端按 `modules.yaml` 声明引入哪些组件、合成能力清单并注入前端，前端只渲染清单声明的模块。`lan-shell` 自 M7 起**只读兼容、不再作为统一出口发布**（源码与 M6 门禁脚本保留在仓库、`cargo build --workspace` 仍产出其二进制）。详见 ADR 0009。
+- `lan-webui` / `lan-shell` 都是聚合层，**不计入 8 个组件**：没有独立的 18 个统一端点；只提供**同源白名单代理** `/p/<name>/api/...`（组件 + 端点双层白名单、有界超时与响应体），不代管管理员密码，只转发 `X-Admin-Password` / `X-Admin-Token`；`scripts/install.sh` 仍只安装 `lan-mdns`，其余二进制由 `release.yml` 的 9×2 产物矩阵分发（含 `lan-webui`，不含只读兼容的 `lan-shell`）。
 - 前端聚合已作为 **M6 工程演进项**落地（不改变 PRD §7.5 的 M0~M5 里程碑状态）：采用
   能力清单驱动渲染，`scripts/gen_capabilities.py` 反向扫描后端 `.route()` / `.route_write()`，
   只有被引用的模块才生成导航、面板与控件，未引用模块不产生 DOM；清单漂移由 CI 拦截。
   方案见 [`docs/M6-PLAN.md`](docs/M6-PLAN.md)，销项见
   [`docs/M6-CHECKLIST.md`](docs/M6-CHECKLIST.md)。
-- 下一项工程演进 **M7**：把 `lan-mdns/webui` 迁为独立项目 `lan-webui/`，同目录内含 Vue
-  前端与自己的 Rust 后端，后端按 `modules.yaml` 引入模块并合成能力清单，前端只渲染清单
-  中的模块；方案见 [`docs/M7-PLAN.md`](docs/M7-PLAN.md)。
+- **M7 已落地**：把 `lan-mdns/webui` 迁为独立项目 `lan-webui/`，同目录内含 Vue
+  前端与自己的 Rust 后端（BFF），后端按 `modules.yaml` 引入模块并合成能力清单，前端只渲染清单
+  中的模块；`lan-webui` 取代 `lan-shell` 成为 8090 统一控制台，`lan-shell` 转为只读兼容。
+  单文件产物仍是 `common/webui/src/assets/index.html`，`lan-mdns` 与 `lan-webui` 共用同一份，
+  M2 的 66/66 与 75/0 零回退。方案见 [`docs/M7-PLAN.md`](docs/M7-PLAN.md)，销项见
+  [`docs/M7-CHECKLIST.md`](docs/M7-CHECKLIST.md)，决策见
+  [`docs/ADR/0009-m7-lan-webui.md`](docs/ADR/0009-m7-lan-webui.md)。

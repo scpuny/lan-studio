@@ -1,0 +1,55 @@
+version: 1
+port: 8090
+# Backend capability declaration for lan-webui (D-M7-1).
+#
+# `enabled_components` is the single source of truth for "which modules the
+# frontend shows". Every name listed here must resolve to a real component with
+# a capabilities.<name>.sample.json; `scripts/gen_capabilities.py --aggregate`
+# merges them into lan-webui/capabilities.json. Remove an entry to drop that
+# component's UI from the console without touching any frontend markup.
+#
+# All 8 components are enabled by default to satisfy "cover every module".
+enabled_components:
+  - name: lan-mdns
+    label: 名称解析与服务发现
+    port: 8080
+    icon: dns
+    tone: blue
+  - name: lan-relay
+    label: 跨网段中继
+    port: 8081
+    icon: relay
+    tone: cyan
+  - name: lan-ca
+    label: 内网凭证
+    port: 8082
+    icon: cert
+    tone: purple
+  - name: lan-scan
+    label: 只读资产与端口探查
+    port: 8083
+    icon: scan
+    tone: teal
+  - name: lan-hosts
+    label: 静态名字映射
+    port: 8084
+    icon: hosts
+    tone: indigo
+  - name: lan-wol
+    label: 网络唤醒
+    port: 8085
+    icon: power
+    tone: amber
+  - name: lan-sync
+    label: 快照同步
+    port: 8086
+    icon: sync
+    tone: green
+  - name: lan-ssdp
+    label: SSDP 发现
+    port: 8087
+    icon: discover
+    tone: orange
+# `requires_lib` modules (e.g. lan-wol.probe) only render when listed here.
+libs:
+  - common-probe

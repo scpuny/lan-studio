@@ -23,6 +23,7 @@ members = [
     "components/lan-sync",
     "components/lan-ssdp",
     "shell",
+    "lan-webui",
 ]
 
 [workspace.package]

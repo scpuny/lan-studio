@@ -131,6 +131,22 @@ export const get = <T>(path: string): Promise<T> => request<T>('GET', path)
 export const post = <T>(path: string, body: unknown = {}): Promise<T> =>
   request<T>('POST', path, body)
 
+/**
+ * Proxy-scoped API client for a single component (M7). Every call is routed
+ * through the same-origin `lan-webui` proxy at `/p/<component>/api/...`; the
+ * proxy forwards `X-Admin-Token` / `X-Admin-Password` and only reaches
+ * allowlisted endpoints, so the console never talks to a component directly.
+ */
+export function componentApi(component: string) {
+  const prefix = `/p/${encodeURIComponent(component)}`
+  return {
+    get: <T>(path: string): Promise<T> => request<T>('GET', `${prefix}${path}`),
+    post: <T>(path: string, body: unknown = {}): Promise<T> =>
+      request<T>('POST', `${prefix}${path}`, body),
+    text: (path: string): Promise<string> => getText(`${prefix}${path}`),
+  }
+}
+
 /** Non-JSON endpoint (Prometheus exposition, CSV export). */
 export async function getText(path: string): Promise<string> {
   let response: Response

@@ -26,6 +26,9 @@ OPENAPI = ROOT / "contracts" / "openapi.yaml"
 SCHEMA = ROOT / "contracts" / "capabilities.schema.json"
 ALLOWLIST = ROOT / "contracts" / "capabilities.allowlist.txt"
 MANIFEST = ROOT / "shell" / "components.yaml"
+AGGREGATE_OUT = ROOT / "lan-webui" / "capabilities.json"
+AGGREGATE_ALLOWLIST = ROOT / "lan-webui" / "capabilities.allowlist.txt"
+AGGREGATE_MODULES = ROOT / "lan-webui" / "modules.yaml"
 
 COMPONENT_NAMES = [
     "lan-mdns", "lan-relay", "lan-ca", "lan-scan",
@@ -390,6 +393,8 @@ def check_manifest(docs):
 
 def main() -> int:
     check_only = "--check" in sys.argv
+    if "--aggregate" in sys.argv:
+        return aggregate_command(check_only)
     if not SCHEMA.exists():
         print("FAIL contracts/capabilities.schema.json missing")
         return 1
@@ -445,6 +450,114 @@ def main() -> int:
     for path in changed:
         print("wrote " + str(path.relative_to(ROOT)))
     print(f"CAPABILITIES GENERATED: {len(docs)} manifests ({len(changed)} changed)")
+    if aggregate_command(check_only=True) != 0:
+        return 1
+    return 0
+
+
+def parse_modules_yaml(text):
+    """Line-based reader for lan-webui/modules.yaml (mirrors the Rust side)."""
+    components = []
+    libs = []
+    current = None
+    in_enabled = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("enabled_components:"):
+            in_enabled = True
+            continue
+        if line.startswith("libs:"):
+            in_enabled = False
+            continue
+        if line.startswith("- name:"):
+            in_enabled = True
+            name = line.split(":", 1)[1].strip()
+            current = {"name": name, "label": name, "port": 0, "icon": "cube", "tone": "blue"}
+            components.append(current)
+            continue
+        if line.startswith("- "):
+            lib = line[2:].strip()
+            if lib and lib != "enabled_components":
+                libs.append(lib)
+            continue
+        if current is not None and in_enabled and ":" in line:
+            key, value = line.split(":", 1)
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            if key == "label":
+                current["label"] = value
+            elif key == "port":
+                current["port"] = int(value)
+            elif key == "icon":
+                current["icon"] = value
+            elif key == "tone":
+                current["tone"] = value
+    return components, libs
+
+
+def aggregate_command(check_only):
+    """Build lan-webui/capabilities.json + allowlist from modules.yaml.
+
+    The backend reads modules.yaml to decide which modules the frontend shows;
+    this command turns that declaration into the embedded manifest and the
+    proxy allowlist, and (in --check mode) fails on any drift.
+    """
+    if not AGGREGATE_MODULES.exists():
+        print("FAIL lan-webui/modules.yaml missing")
+        return 1
+    text = AGGREGATE_MODULES.read_text(encoding="utf-8")
+    components, libs = parse_modules_yaml(text)
+    if not components:
+        print("FAIL aggregate: no enabled_components in modules.yaml")
+        return 1
+    openapi_text = OPENAPI.read_text(encoding="utf-8")
+    comp_out = []
+    errors = []
+    for c in components:
+        name = c["name"]
+        if name not in COMPONENT_NAMES:
+            errors.append(f"aggregate: {name} is not a known component")
+            continue
+        doc = normalize_writes(build(name), name)
+        errors.extend(verify(doc, name, openapi_text))
+        comp_out.append({
+            "name": name, "label": c["label"], "port": c["port"],
+            "icon": c["icon"], "tone": c["tone"], "modules": doc["modules"],
+        })
+    if errors:
+        for e in errors:
+            print("FAIL " + e)
+        return 1
+    agg = {
+        "schema": 1, "component": "lan-webui", "runtime": "aggregated",
+        "libs": libs, "components": comp_out,
+    }
+    rendered = json.dumps(agg, ensure_ascii=False, indent=2) + "\n"
+    lines = set()
+    for c in comp_out:
+        for m in c["modules"]:
+            for panel in m["panels"]:
+                lines.add(f"{c['name']}|{panel['endpoint']['path']}")
+                for a in panel.get("actions", []):
+                    lines.add(f"{c['name']}|{a['path']}")
+    allow_text = "\n".join(sorted(lines)) + "\n"
+    if check_only:
+        existing = AGGREGATE_OUT.read_text(encoding="utf-8") if AGGREGATE_OUT.exists() else None
+        existing_allow = (AGGREGATE_ALLOWLIST.read_text(encoding="utf-8")
+                          if AGGREGATE_ALLOWLIST.exists() else None)
+        if existing != rendered:
+            print("FAIL drift: lan-webui/capabilities.json (run --aggregate)")
+            return 1
+        if existing_allow != allow_text:
+            print("FAIL drift: lan-webui/capabilities.allowlist.txt (run --aggregate)")
+            return 1
+        print("AGGREGATE OK: lan-webui/capabilities.json matches modules.yaml")
+        return 0
+    AGGREGATE_OUT.write_text(rendered, encoding="utf-8")
+    AGGREGATE_ALLOWLIST.write_text(allow_text, encoding="utf-8")
+    print(f"wrote {AGGREGATE_OUT.relative_to(ROOT)} and "
+          f"{AGGREGATE_ALLOWLIST.relative_to(ROOT)}")
     return 0
 
 

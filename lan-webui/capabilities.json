@@ -1,0 +1,2187 @@
+{
+  "schema": 1,
+  "component": "lan-webui",
+  "runtime": "aggregated",
+  "libs": [
+    "common-probe"
+  ],
+  "components": [
+    {
+      "name": "lan-mdns",
+      "label": "名称解析与服务发现",
+      "port": 8080,
+      "icon": "dns",
+      "tone": "blue",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-mdns.records",
+          "title": "资源记录",
+          "icon": "dns",
+          "tone": "blue",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "records.table",
+              "title": "已发布记录",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/records"
+              },
+              "columns": [
+                {
+                  "key": "name",
+                  "label": "名称"
+                },
+                {
+                  "key": "type",
+                  "label": "类型"
+                },
+                {
+                  "key": "value",
+                  "label": "值"
+                }
+              ]
+            },
+            {
+              "id": "records.interfaces",
+              "title": "网卡",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/interfaces"
+              }
+            },
+            {
+              "id": "records.queries",
+              "title": "查询审计",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/queries"
+              }
+            },
+            {
+              "id": "records.probe",
+              "title": "主动探测",
+              "widget": "action-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/browse"
+              },
+              "actions": [
+                {
+                  "id": "probe",
+                  "label": "发起探测",
+                  "method": "POST",
+                  "path": "/api/probe",
+                  "fields": [
+                    {
+                      "key": "name",
+                      "label": "名称",
+                      "type": "text",
+                      "required": true
+                    },
+                    {
+                      "key": "type",
+                      "label": "类型",
+                      "type": "text",
+                      "required": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-mdns.browse",
+          "title": "服务浏览",
+          "icon": "discover",
+          "tone": "cyan",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "browse.table",
+              "title": "统一服务记录",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/browse/unified"
+              },
+              "columns": [
+                {
+                  "key": "name",
+                  "label": "名称"
+                },
+                {
+                  "key": "type",
+                  "label": "类型"
+                },
+                {
+                  "key": "address",
+                  "label": "地址"
+                },
+                {
+                  "key": "source",
+                  "label": "来源"
+                }
+              ]
+            },
+            {
+              "id": "browse.conflicts",
+              "title": "冲突检测",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/conflicts"
+              }
+            },
+            {
+              "id": "browse.targets",
+              "title": "健康目标",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/health/targets"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lan-relay",
+      "label": "跨网段中继",
+      "port": 8081,
+      "icon": "relay",
+      "tone": "cyan",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-relay.stats",
+          "title": "中继统计",
+          "icon": "relay",
+          "tone": "cyan",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "relay.stats",
+              "title": "转发与环路计数",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/relay/stats"
+              }
+            },
+            {
+              "id": "relay.interfaces",
+              "title": "出入网卡",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/relay/interfaces"
+              }
+            }
+          ]
+        },
+        {
+          "id": "lan-relay.inject",
+          "title": "环路注入",
+          "icon": "activity",
+          "tone": "amber",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "relay.inject",
+              "title": "注入测试帧",
+              "widget": "form",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/relay/stats"
+              },
+              "actions": [
+                {
+                  "id": "inject",
+                  "label": "注入",
+                  "method": "POST",
+                  "path": "/api/relay/inject"
+                },
+                {
+                  "id": "mark-local",
+                  "label": "标记本地包",
+                  "method": "POST",
+                  "path": "/api/relay/mark-local"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lan-ca",
+      "label": "内网凭证",
+      "port": 8082,
+      "icon": "cert",
+      "tone": "purple",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-ca.root",
+          "title": "根凭证",
+          "icon": "cert",
+          "tone": "purple",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "ca.root",
+              "title": "根指纹",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ca/root"
+              }
+            },
+            {
+              "id": "ca.export",
+              "title": "安全导出",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ca/export"
+              }
+            }
+          ]
+        },
+        {
+          "id": "lan-ca.certs",
+          "title": "凭证管理",
+          "icon": "cert",
+          "tone": "indigo",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "ca.certs",
+              "title": "已签发凭证",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ca/certificates"
+              },
+              "columns": [
+                {
+                  "key": "subject",
+                  "label": "主体"
+                },
+                {
+                  "key": "serial",
+                  "label": "序号"
+                },
+                {
+                  "key": "status",
+                  "label": "状态"
+                }
+              ],
+              "actions": [
+                {
+                  "id": "issue",
+                  "label": "签发",
+                  "method": "POST",
+                  "path": "/api/ca/issue",
+                  "fields": [
+                    {
+                      "key": "subject",
+                      "label": "主体",
+                      "type": "text",
+                      "required": true
+                    }
+                  ]
+                },
+                {
+                  "id": "renew",
+                  "label": "续期",
+                  "method": "POST",
+                  "path": "/api/ca/renew",
+                  "fields": [
+                    {
+                      "key": "serial",
+                      "label": "序号",
+                      "type": "text",
+                      "required": true
+                    }
+                  ]
+                },
+                {
+                  "id": "revoke",
+                  "label": "吊销",
+                  "method": "POST",
+                  "path": "/api/ca/revoke",
+                  "fields": [
+                    {
+                      "key": "serial",
+                      "label": "序号",
+                      "type": "text",
+                      "required": true
+                    }
+                  ]
+                },
+                {
+                  "id": "verify",
+                  "label": "验签",
+                  "method": "POST",
+                  "path": "/api/ca/verify",
+                  "fields": [
+                    {
+                      "key": "token",
+                      "label": "凭证",
+                      "type": "textarea",
+                      "required": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ca.crl",
+              "title": "吊销列表",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ca/crl"
+              }
+            }
+          ]
+        },
+        {
+          "id": "lan-ca.audit",
+          "title": "签发审计",
+          "icon": "history",
+          "tone": "teal",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "ca.audit",
+              "title": "审计链",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ca/audit"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lan-scan",
+      "label": "只读资产与端口探查",
+      "port": 8083,
+      "icon": "scan",
+      "tone": "teal",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-scan.status",
+          "title": "扫描状态",
+          "icon": "scan",
+          "tone": "teal",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "scan.status",
+              "title": "速率与并发上界",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/scan/status"
+              },
+              "actions": [
+                {
+                  "id": "start",
+                  "label": "启动扫描",
+                  "method": "POST",
+                  "path": "/api/scan/start"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-scan.results",
+          "title": "探查结果",
+          "icon": "scan",
+          "tone": "blue",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "scan.results",
+              "title": "主机与端口",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/scan/results"
+              },
+              "columns": [
+                {
+                  "key": "host",
+                  "label": "主机"
+                },
+                {
+                  "key": "ports",
+                  "label": "开放端口"
+                }
+              ]
+            },
+            {
+              "id": "scan.snapshot",
+              "title": "结果快照",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/scan/snapshot"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lan-hosts",
+      "label": "静态名字映射",
+      "port": 8084,
+      "icon": "hosts",
+      "tone": "indigo",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-hosts.mappings",
+          "title": "静态映射",
+          "icon": "hosts",
+          "tone": "indigo",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "hosts.mappings",
+              "title": "映射清单",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/hosts/mappings"
+              },
+              "columns": [
+                {
+                  "key": "name",
+                  "label": "主机名"
+                },
+                {
+                  "key": "ip",
+                  "label": "地址"
+                },
+                {
+                  "key": "comment",
+                  "label": "备注"
+                }
+              ],
+              "actions": [
+                {
+                  "id": "upsert",
+                  "label": "新增/更新",
+                  "method": "POST",
+                  "path": "/api/hosts/mapping",
+                  "fields": [
+                    {
+                      "key": "name",
+                      "label": "主机名",
+                      "type": "text",
+                      "required": true
+                    },
+                    {
+                      "key": "ip",
+                      "label": "地址",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                },
+                {
+                  "id": "remove",
+                  "label": "删除",
+                  "method": "POST",
+                  "path": "/api/hosts/remove",
+                  "fields": [
+                    {
+                      "key": "name",
+                      "label": "主机名",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                },
+                {
+                  "id": "import",
+                  "label": "导入",
+                  "method": "POST",
+                  "path": "/api/hosts/import",
+                  "fields": [
+                    {
+                      "key": "text",
+                      "label": "映射文本",
+                      "type": "textarea",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                }
+              ]
+            },
+            {
+              "id": "hosts.status",
+              "title": "发布状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/hosts/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "lan-hosts.render",
+          "title": "渲染与发布",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "hosts.render",
+              "title": "hosts 预览",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/hosts/render"
+              },
+              "actions": [
+                {
+                  "id": "publish",
+                  "label": "原子发布",
+                  "method": "POST",
+                  "path": "/api/hosts/publish",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lan-wol",
+      "label": "网络唤醒",
+      "port": 8085,
+      "icon": "power",
+      "tone": "amber",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-wol.devices",
+          "title": "唤醒设备",
+          "icon": "power",
+          "tone": "amber",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "wol.devices",
+              "title": "已登记设备",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/wol/devices"
+              },
+              "columns": [
+                {
+                  "key": "name",
+                  "label": "名称"
+                },
+                {
+                  "key": "mac",
+                  "label": "MAC"
+                },
+                {
+                  "key": "state",
+                  "label": "状态"
+                }
+              ],
+              "actions": [
+                {
+                  "id": "upsert",
+                  "label": "登记设备",
+                  "method": "POST",
+                  "path": "/api/wol/device",
+                  "fields": [
+                    {
+                      "key": "device_id",
+                      "label": "设备 ID",
+                      "type": "text",
+                      "required": true
+                    },
+                    {
+                      "key": "mac",
+                      "label": "MAC",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                },
+                {
+                  "id": "remove",
+                  "label": "移除",
+                  "method": "POST",
+                  "path": "/api/wol/remove",
+                  "fields": [
+                    {
+                      "key": "device_id",
+                      "label": "设备 ID",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                },
+                {
+                  "id": "wake",
+                  "label": "唤醒",
+                  "method": "POST",
+                  "path": "/api/wol/wake",
+                  "fields": [
+                    {
+                      "key": "device_id",
+                      "label": "设备 ID",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                }
+              ]
+            },
+            {
+              "id": "wol.status",
+              "title": "组件状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/wol/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "lan-wol.probe",
+          "title": "电源状态探测",
+          "icon": "activity",
+          "tone": "green",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "wol.probe",
+              "title": "只读 TCP 探测",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/wol/status"
+              },
+              "actions": [
+                {
+                  "id": "probe",
+                  "label": "重新探测",
+                  "method": "POST",
+                  "path": "/api/wol/probe",
+                  "write": true
+                }
+              ]
+            },
+            {
+              "id": "wol.history",
+              "title": "唤醒审计",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/wol/history"
+              }
+            }
+          ],
+          "requires_lib": "common-probe"
+        }
+      ]
+    },
+    {
+      "name": "lan-sync",
+      "label": "快照同步",
+      "port": 8086,
+      "icon": "sync",
+      "tone": "green",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-sync.nodes",
+          "title": "同步节点",
+          "icon": "sync",
+          "tone": "green",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "sync.nodes",
+              "title": "已登记节点",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/sync/nodes"
+              },
+              "columns": [
+                {
+                  "key": "name",
+                  "label": "节点"
+                },
+                {
+                  "key": "url",
+                  "label": "地址"
+                },
+                {
+                  "key": "status",
+                  "label": "状态"
+                }
+              ],
+              "actions": [
+                {
+                  "id": "upsert",
+                  "label": "登记节点",
+                  "method": "POST",
+                  "path": "/api/sync/node",
+                  "fields": [
+                    {
+                      "key": "name",
+                      "label": "节点",
+                      "type": "text",
+                      "required": true
+                    },
+                    {
+                      "key": "url",
+                      "label": "地址",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                },
+                {
+                  "id": "remove",
+                  "label": "移除",
+                  "method": "POST",
+                  "path": "/api/sync/remove",
+                  "fields": [
+                    {
+                      "key": "name",
+                      "label": "节点",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                }
+              ]
+            },
+            {
+              "id": "sync.status",
+              "title": "同步状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/sync/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "lan-sync.transfer",
+          "title": "配置传输",
+          "icon": "sync",
+          "tone": "blue",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "sync.history",
+              "title": "决策历史",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/sync/history"
+              },
+              "actions": [
+                {
+                  "id": "pull",
+                  "label": "拉取",
+                  "method": "POST",
+                  "path": "/api/sync/pull",
+                  "fields": [
+                    {
+                      "key": "name",
+                      "label": "节点",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                },
+                {
+                  "id": "push",
+                  "label": "推送",
+                  "method": "POST",
+                  "path": "/api/sync/push",
+                  "fields": [
+                    {
+                      "key": "name",
+                      "label": "节点",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                },
+                {
+                  "id": "confirm",
+                  "label": "确认冲突",
+                  "method": "POST",
+                  "path": "/api/sync/confirm",
+                  "fields": [
+                    {
+                      "key": "id",
+                      "label": "决策 ID",
+                      "type": "text",
+                      "required": true
+                    }
+                  ],
+                  "write": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lan-ssdp",
+      "label": "SSDP 发现",
+      "port": 8087,
+      "icon": "discover",
+      "tone": "orange",
+      "modules": [
+        {
+          "id": "core.status",
+          "title": "状态总览",
+          "icon": "grid",
+          "tone": "blue",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "status.kv",
+              "title": "运行状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.config",
+          "title": "配置管理",
+          "icon": "sliders",
+          "tone": "indigo",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "config.editor",
+              "title": "配置编辑器",
+              "widget": "code-editor",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config"
+              },
+              "actions": [
+                {
+                  "id": "save",
+                  "label": "校验并保存",
+                  "method": "POST",
+                  "path": "/api/config",
+                  "write": true
+                },
+                {
+                  "id": "reload",
+                  "label": "重新载入",
+                  "method": "POST",
+                  "path": "/api/reload",
+                  "write": true
+                },
+                {
+                  "id": "export",
+                  "label": "导出快照",
+                  "method": "GET",
+                  "path": "/api/config/snapshot"
+                },
+                {
+                  "id": "import",
+                  "label": "导入快照",
+                  "method": "POST",
+                  "path": "/api/config/snapshot",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "core.observe",
+          "title": "可观测",
+          "icon": "activity",
+          "tone": "cyan",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "observe.metrics",
+              "title": "Prometheus 指标",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/metrics"
+              }
+            },
+            {
+              "id": "observe.logs",
+              "title": "最近日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.logs",
+          "title": "日志",
+          "icon": "terminal",
+          "tone": "teal",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "logs.list",
+              "title": "运行日志",
+              "widget": "log-list",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/logs"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.alerts",
+          "title": "告警",
+          "icon": "bell",
+          "tone": "amber",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "alerts.kv",
+              "title": "告警通道",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/alerts"
+              }
+            }
+          ]
+        },
+        {
+          "id": "core.history",
+          "title": "版本历史",
+          "icon": "history",
+          "tone": "purple",
+          "area": "workspace",
+          "panels": [
+            {
+              "id": "history.list",
+              "title": "快照与回滚",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/config/history"
+              },
+              "actions": [
+                {
+                  "id": "rollback",
+                  "label": "回滚",
+                  "method": "POST",
+                  "path": "/api/config/rollback",
+                  "write": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lan-ssdp.devices",
+          "title": "发现设备",
+          "icon": "discover",
+          "tone": "amber",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "ssdp.devices",
+              "title": "统一服务记录",
+              "widget": "table",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ssdp/devices"
+              },
+              "columns": [
+                {
+                  "key": "name",
+                  "label": "名称"
+                },
+                {
+                  "key": "address",
+                  "label": "地址"
+                },
+                {
+                  "key": "ttl",
+                  "label": "TTL"
+                }
+              ],
+              "actions": [
+                {
+                  "id": "refresh",
+                  "label": "刷新发现",
+                  "method": "POST",
+                  "path": "/api/ssdp/refresh",
+                  "write": true
+                }
+              ]
+            },
+            {
+              "id": "ssdp.status",
+              "title": "监听状态",
+              "widget": "kv-grid",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ssdp/status"
+              }
+            }
+          ]
+        },
+        {
+          "id": "lan-ssdp.snapshot",
+          "title": "发现快照",
+          "icon": "cube",
+          "tone": "teal",
+          "area": "feature",
+          "panels": [
+            {
+              "id": "ssdp.snapshot",
+              "title": "结果快照",
+              "widget": "text-view",
+              "endpoint": {
+                "method": "GET",
+                "path": "/api/ssdp/snapshot"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

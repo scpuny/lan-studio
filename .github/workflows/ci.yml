@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: components/lan-mdns/webui
+        working-directory: lan-webui/webui
     steps:
       - uses: actions/checkout@v4
 
@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: components/lan-mdns/webui/package-lock.json
+          cache-dependency-path: lan-webui/webui/package-lock.json
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -67,6 +67,13 @@ jobs:
       - name: Verify M6 capability manifests match backend routes
         run: python3 scripts/gen_capabilities.py --check
 
+      - name: Regenerate + verify M7 aggregate manifest (lan-webui)
+        run: |
+          set -e
+          python3 scripts/gen_capabilities.py --aggregate
+          git diff --exit-code lan-webui/capabilities.json lan-webui/capabilities.allowlist.txt \
+            || { echo "lan-webui aggregate drifted; run scripts/gen_capabilities.py --aggregate"; exit 1; }
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -93,8 +100,8 @@ jobs:
       - name: Offline checks for every binary
         run: |
           set -e
-          python3 -m py_compile scripts/test_m5.py scripts/test_m6.py scripts/test_ecosystem.py scripts/gen_capabilities.py
-          for bin in lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell; do
+          python3 -m py_compile scripts/test_m5.py scripts/test_m6.py scripts/test_m7.py scripts/test_ecosystem.py scripts/gen_capabilities.py
+          for bin in lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell lan-webui; do
             if [ "$bin" = "lan-mdns" ]; then
               LAN_STUDIO_CONFIG="$(mktemp)" ./target/debug/lan-mdns --validate
             else
@@ -108,11 +115,14 @@ jobs:
       - name: M6 runtime gate (capability-driven UI + bounded same-origin proxy)
         run: python3 scripts/test_m6.py
 
+      - name: M7 gate (lan-webui is the single source of truth for the console)
+        run: python3 scripts/test_m7.py
+
       - name: Ecosystem DoD (PRD 8.2, six gates)
         run: python3 scripts/test_ecosystem.py
 
       - name: Build release artifact
-        run: cargo build --release -p lan-mdns
+        run: cargo build --release -p lan-mdns -p lan-webui
 
       - name: API contract test (runtime conformance, F-J03)
         env:

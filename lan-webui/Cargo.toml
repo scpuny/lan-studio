@@ -1,0 +1,15 @@
+[package]
+name = "lan-webui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio unified web console: Vue frontend + Rust BFF, capability-driven (D-M7)"
+
+[[bin]]
+name = "lan-webui"
+path = "src/main.rs"
+
+[dependencies]
+common-api = { workspace = true }
+common-auth = { workspace = true }

@@ -10,7 +10,9 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 export default defineConfig({
   plugins: [vue(), viteSingleFile({ removeViteModuleLoader: true })],
   build: {
-    outDir: fileURLToPath(new URL('../../../common/webui/src/assets', import.meta.url)),
+    // Lan Studio keeps a single shared artifact: both `lan-mdns` and `lan-webui`
+    // embed the same self-contained HTML (D-M7-3), so the outDir stays put.
+    outDir: fileURLToPath(new URL('../../common/webui/src/assets', import.meta.url)),
     emptyOutDir: false,
     cssCodeSplit: false,
     assetsInlineLimit: 100 * 1024 * 1024,

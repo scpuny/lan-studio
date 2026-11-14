@@ -35,12 +35,13 @@ jobs:
       - name: Install cross
         uses: taiki-e/install-action@cross
 
-      # 8 components (PRD 2.2) + lan-shell, which is the 9th binary but NOT a
-      # 9th component (aggregation layer, D-M5-10).
+      # 8 components (PRD 2.2) + lan-shell (9th, kept for read-only
+      # compatibility, D-M7-2) + lan-webui (new unified console / aggregation
+      # layer, D-M7-1). lan-webui is the 10th binary but NOT a component.
       - name: Build all binaries for ${{ matrix.target }}
         run: |
           set -e
-          BINS="lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell"
+          BINS="lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell lan-webui"
           ARGS=""
           for bin in $BINS; do ARGS="$ARGS -p $bin"; done
           cross build --release --locked --target "${{ matrix.target }}" $ARGS
@@ -48,7 +49,7 @@ jobs:
       - name: Package with per-file sha256 manifest
         run: |
           set -e
-          BINS="lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell"
+          BINS="lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell lan-webui"
           mkdir -p dist/bin dist/conf
           for bin in $BINS; do
             SRC="target/${{ matrix.target }}/release/$bin"
@@ -60,6 +61,7 @@ jobs:
             fi
           done
           cp shell/components.yaml dist/conf/shell-components.yaml
+          cp lan-webui/modules.yaml dist/conf/lan-webui.modules.yaml
           cp README.md dist/PROJECT-README.md
           cp docs/M5-CHECKLIST.md dist/M5-CHECKLIST.md
           # Deterministic order -> stable SHA256SUMS.txt content.

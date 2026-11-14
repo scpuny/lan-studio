@@ -165,6 +165,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lan-webui"
+version = "0.1.0"
+dependencies = [
+ "common-api",
+ "common-auth",
+]
+
+[[package]]
 name = "lan-wol"
 version = "0.1.0"
 dependencies = [
