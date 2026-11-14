@@ -39,6 +39,8 @@
 | `hosts_publish_failed` | `lan-hosts` | warning | 渲染产物发布失败，旧文件保持完好 | `path,reason` | 300s |
 | `hosts_conflict_detected` | `lan-hosts` | warning | 同名异 IP 或 `.local` 保留后缀被拒绝 | `name,reason` | 300s |
 | `ssdp_discovery_error` | `lan-ssdp` | info | 发现应答解析失败 | `reason` | 600s |
+| `sync_node_unreachable` | `lan-sync` | warning | 已登记节点快照请求超时或不可达 | `node` | 300s |
+| `shell_component_offline` | `lan-shell` | info | 健康探测发现组件离线 | `component` | 600s |
 
 ## 3. 平台适配（由 `common-alert` 统一实现）
 

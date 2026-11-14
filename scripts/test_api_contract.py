@@ -462,8 +462,27 @@ def main() -> int:
     ops = parse_openapi(openapi_text)
     by_key = {op.key: op for op in ops}
     check("openapi paths block parses", bool(ops), "{} operations".format(len(ops)))
-    check("22 documented paths", len({op.path for op in ops}) == 22,
-          str(sorted({op.path for op in ops}))[:120])
+    # M3/M4/M5 append component-specific paths to the same document. This gate
+    # owns the M2 surface only: assert its full inventory is still documented,
+    # rather than pinning the total path count (which grows every milestone).
+    m2_paths = {
+        "/healthz", "/readyz", "/api/status", "/api/metrics", "/api/config",
+        "/api/config/snapshot", "/api/config/history", "/api/config/rollback",
+        "/api/reload", "/api/logs", "/api/logs/stream", "/api/alerts",
+        "/api/auth", "/api/auth/password", "/api/auth/verify",
+        "/api/records", "/api/probe", "/api/interfaces",
+        "/api/health/targets", "/api/queries", "/api/browse",
+        "/api/browse/unified", "/api/conflicts",
+    }
+    documented = {op.path for op in ops}
+    check("all 23 M2 paths remain documented in openapi",
+          m2_paths <= documented, str(sorted(m2_paths - documented))[:160])
+    # Endpoints owned by the other 7 components are covered by their own
+    # runtime gates (test_m3/m4/m5.py); this binary cannot serve them.
+    component_prefixes = (
+        "/api/relay/", "/api/ca/", "/api/scan/", "/api/hosts/",
+        "/api/wol/", "/api/sync/", "/api/ssdp/", "/api/shell/",
+    )
 
     referenced = yaml_operations()
     if referenced is None:
@@ -535,7 +554,14 @@ def main() -> int:
               and str(snapshot_data.get("checksum", "")).startswith("sha256:"),
               str(sorted(snapshot_data))[:120])
 
-        client.call("POST", "/api/probe", {"name": "nas.local", "type": "A"})
+        # QU unicast probe: binds an ephemeral port instead of re-binding the
+        # multicast socket, so the gate is portable across hosts where the
+        # multicast stack is restricted (e.g. macOS / containers). The M2
+        # implementation accepts the `"true"` string form for this flag.
+        client.call("POST", "/api/probe",
+                    {"name": "nas.local", "type": "A", "unicast": "true"})
+        # M5 unified service-record view: same envelope, source fixed to mdns.
+        client.call("GET", "/api/browse/unified")
 
         # A write before any password exists must hit the setup flow.
         for path, body in (("/api/config", {"text": config_text}),
@@ -599,6 +625,8 @@ def main() -> int:
         # declares for that specific operation.
         section("3 · 逐操作状态码")
         for op in sorted(ops, key=lambda item: (item.path, item.method)):
+            if op.path.startswith(component_prefixes):
+                continue
             observed = client.seen.get((op.method, op.path, "happy"))
             label = "{} {} conforms".format(op.method, op.path)
             if observed is None:
@@ -817,7 +845,8 @@ def main() -> int:
             ("POST", "/api/auth/verify"), ("GET", "/api/records"),
             ("POST", "/api/probe"), ("GET", "/api/interfaces"),
             ("GET", "/api/health/targets"), ("GET", "/api/queries"),
-            ("GET", "/api/browse"), ("GET", "/api/conflicts"),
+            ("GET", "/api/browse"), ("GET", "/api/browse/unified"),
+            ("GET", "/api/conflicts"),
         ]
         missing_routes = []      # documented, but the binary does not serve it
         extra_routes = []        # served, but the contract never mentions it
@@ -836,10 +865,13 @@ def main() -> int:
               not missing_routes, "; ".join(missing_routes[:6]))
         check("no undocumented API route is exposed",
               not extra_routes, "; ".join(extra_routes[:6]))
+        # Paths owned by other components are intentionally not served by the
+        # M2 binary; only M2-namespace operations must match its router table.
         untouched = sorted(
             "{} {}".format(op.method, op.path) for op in ops
-            if (op.method, op.path) not in set(implemented))
-        check("contract has no operation the router forgot", not untouched,
+            if (op.method, op.path) not in set(implemented)
+            and not op.path.startswith(component_prefixes))
+        check("contract has no M2 operation the router forgot", not untouched,
               "; ".join(untouched[:6]))
 
     # -------------------------------------------------------------- report

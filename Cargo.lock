@@ -135,6 +135,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "lan-shell"
+version = "0.1.0"
+dependencies = [
+ "common-api",
+]
+
+[[package]]
+name = "lan-ssdp"
+version = "0.1.0"
+dependencies = [
+ "common-api",
+ "common-component",
+ "common-config",
+ "common-metrics",
+ "common-net",
+]
+
+[[package]]
+name = "lan-sync"
+version = "0.1.0"
+dependencies = [
+ "common-api",
+ "common-component",
+ "common-config",
+ "common-crypto",
+ "common-metrics",
+]
+
+[[package]]
 name = "lan-wol"
 version = "0.1.0"
 dependencies = [

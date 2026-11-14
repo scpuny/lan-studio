@@ -20,6 +20,9 @@ members = [
     "components/lan-scan",
     "components/lan-hosts",
     "components/lan-wol",
+    "components/lan-sync",
+    "components/lan-ssdp",
+    "shell",
 ]
 
 [workspace.package]

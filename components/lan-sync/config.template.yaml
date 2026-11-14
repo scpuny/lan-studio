@@ -1,0 +1,48 @@
+version: 1
+component: lan-sync
+
+server:
+  listen: "127.0.0.1"
+  port: 8086
+  webui: true
+  admin_token: ""
+  log_level: info
+
+observability:
+  metrics: true
+  alerts: true
+  history_limit: 30
+
+logging:
+  max_bytes: 1048576
+  backup_count: 3
+  level: info
+
+alerts:
+  enabled: true
+  webhooks: []
+  cooldown_seconds: 300
+  timeout_seconds: 5.0
+  max_retries: 2
+
+# --- lan-sync business configuration (PRD 4.8: snapshot-based, explicit conflict policy) ---
+sync:
+  nodes_path: "lan-sync.nodes.json"
+  history_path: "lan-sync.history.json"
+  max_nodes: 64
+  # reject = never silently overwrite; last_write_wins / manual must be opted in.
+  strategy: reject
+  request_timeout_ms: 2000
+  # Empty disables node signing. Never log / export this value.
+  shared_secret: ""
+  history_limit: 200
+  # Only these component identifiers may be synchronized.
+  allowed_components:
+    - lan-mdns
+    - lan-relay
+    - lan-ca
+    - lan-scan
+    - lan-hosts
+    - lan-wol
+    - lan-sync
+    - lan-ssdp

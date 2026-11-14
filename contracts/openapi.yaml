@@ -773,6 +773,166 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiOk"
 
+  # --- M5: lan-sync (PRD 4.8, snapshot-based, explicit conflict policy) ---
+  /api/sync/nodes:
+    get:
+      tags: [component]
+      summary: Registered synchronization nodes (never returns tokens)
+      responses:
+        "200":
+          description: Nodes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/sync/status:
+    get:
+      tags: [component]
+      summary: Sync counters and current conflict strategy
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/sync/history:
+    get:
+      tags: [component]
+      summary: Bounded sync decision audit trail
+      responses:
+        "200":
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/sync/node:
+    post:
+      tags: [component]
+      summary: Register or update a sync node
+      responses:
+        "200":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/sync/remove:
+    post:
+      tags: [component]
+      summary: Remove a registered node
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/sync/pull:
+    post:
+      tags: [component]
+      summary: Pull a config snapshot from a registered node
+      responses:
+        "200":
+          description: Pull decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/sync/push:
+    post:
+      tags: [component]
+      summary: Push the local config snapshot to a registered node
+      responses:
+        "200":
+          description: Push result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/sync/confirm:
+    post:
+      tags: [component]
+      summary: Confirm or reject a pending manual-strategy item
+      responses:
+        "200":
+          description: Decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+  # --- M5: lan-ssdp (PRD 4.9, read-only discovery) ---
+  /api/ssdp/devices:
+    get:
+      tags: [component]
+      summary: Discovered devices in the unified service-record model
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ssdp/snapshot:
+    get:
+      tags: [component]
+      summary: Self-contained bounded discovery snapshot
+      responses:
+        "200":
+          description: Snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ssdp/status:
+    get:
+      tags: [component]
+      summary: Discovery counters and TTL settings
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/ssdp/refresh:
+    post:
+      tags: [component]
+      summary: Trigger one bounded M-SEARCH discovery round
+      responses:
+        "200":
+          description: Started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+  /api/browse/unified:
+    get:
+      tags: [component]
+      summary: lan-mdns DNS-SD observations in the unified service-record model
+      responses:
+        "200":
+          description: Unified service records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
+  # --- M5: Lan Studio Shell (aggregation layer, not a component) ---
+  /api/shell/status:
+    get:
+      tags: [component]
+      summary: Component navigation manifest with bounded health probe results
+      responses:
+        "200":
+          description: Shell status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiOk"
+
 components:
   securitySchemes:
     AdminToken:

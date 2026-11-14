@@ -108,6 +108,24 @@ lanstudio_<c>_<metric>[_<unit>]
 
 所有标签均为**固定枚举或聚合值**，不含 IP / 域名 / MAC / 设备名，符合第 4 节基数控制。
 
+## 3.7 M5 组件与统一出口专有指标
+
+> `lan-sync` / `lan-ssdp` 共用 `common-component` 运行时，第 2 节 9 项必备族自动输出；`lan-shell` 是聚合层，同前缀规则输出状态指标。
+
+| 归属 | 指标 | 类型 | 标签 | 说明 |
+| --- | --- | --- | --- | --- |
+| `lan-sync` | `lanstudio_sync_nodes` | gauge | — | 已登记节点数（有界 `max_nodes`） |
+| | `lanstudio_sync_pull_total` / `lanstudio_sync_push_total` | counter | — | 拉取 / 推送次数 |
+| | `lanstudio_sync_conflicts_total` | counter | `strategy` | 冲突决策次数（`reject` / `last_write_wins` / `manual` 固定枚举） |
+| | `lanstudio_sync_audit_entries` | gauge | — | 审计记录数（有界） |
+| `lan-ssdp` | `lanstudio_ssdp_devices` | gauge | — | 当前发现设备数（有界 `max_devices`） |
+| | `lanstudio_ssdp_expired_total` | counter | — | TTL / byebye 清理数 |
+| | `lanstudio_ssdp_discovery_errors_total` | counter | — | 畸形应答解析失败数 |
+| | `lanstudio_ssdp_probe_total` | counter | — | 发出的 M-SEARCH 次数 |
+| `lan-shell` | `lanstudio_shell_components_online` | gauge | — | 健康探测在线组件数 |
+
+所有标签均为**固定枚举或聚合值**，不含 IP / 域名 / USN / token / 设备名，符合第 4 节基数控制。
+
 ## 4. 标签规范（强制）
 
 1. `path` 必须是**路由模板**（如 `/api/config/snapshot`），禁止使用原始 URL 或带查询参数的路径。

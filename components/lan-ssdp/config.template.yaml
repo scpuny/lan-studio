@@ -1,0 +1,39 @@
+version: 1
+component: lan-ssdp
+
+server:
+  listen: "127.0.0.1"
+  port: 8087
+  webui: true
+  admin_token: ""
+  log_level: info
+
+observability:
+  metrics: true
+  alerts: true
+  history_limit: 30
+
+logging:
+  max_bytes: 1048576
+  backup_count: 3
+  level: info
+
+alerts:
+  enabled: true
+  webhooks: []
+  cooldown_seconds: 300
+  timeout_seconds: 5.0
+  max_retries: 2
+
+# --- lan-ssdp business configuration (PRD 4.9: read-only discovery) ---
+ssdp:
+  group: "239.255.255.250"
+  port: 1900
+  search_interval_seconds: 60
+  max_age_seconds: 1800
+  max_devices: 512
+  socket_timeout_ms: 300
+  results_path: "lan-ssdp.devices.json"
+  # Always false: LOCATION headers are recorded as attributes but never fetched,
+  # and no SOAP / device control interface is ever invoked.
+  fetch_descriptions: false

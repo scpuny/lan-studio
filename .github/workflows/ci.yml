@@ -87,6 +87,24 @@ jobs:
       - name: M4 runtime gate (hosts / wol + no-overlap)
         run: python3 scripts/test_m4.py
 
+      - name: Offline checks for every binary
+        run: |
+          set -e
+          python3 -m py_compile scripts/test_m5.py scripts/test_ecosystem.py
+          for bin in lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell; do
+            if [ "$bin" = "lan-mdns" ]; then
+              LAN_STUDIO_CONFIG="$(mktemp)" ./target/debug/lan-mdns --validate
+            else
+              ./target/debug/"$bin" --check
+            fi
+          done
+
+      - name: M5 runtime gate (sync / ssdp / shell + unified service record)
+        run: python3 scripts/test_m5.py
+
+      - name: Ecosystem DoD (PRD 8.2, six gates)
+        run: python3 scripts/test_ecosystem.py
+
       - name: Build release artifact
         run: cargo build --release -p lan-mdns
 

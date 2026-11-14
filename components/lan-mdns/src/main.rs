@@ -336,6 +336,7 @@ fn main() {
         .route("GET", "/api/interfaces", view_interfaces)
         .route("GET", "/api/queries", view_queries)
         .route("GET", "/api/browse", view_browse)
+        .route("GET", "/api/browse/unified", view_browse_unified)
         .route("GET", "/api/conflicts", view_conflicts)
         .route("GET", "/api/health/targets", view_health_targets)
         .route("POST", "/api/probe", view_probe);
@@ -1618,6 +1619,116 @@ fn view_browse(req: &Request, _: &Context) -> Response {
             total,
             group_json.join(","),
             groups.len()
+        ),
+    )
+}
+
+/// M5 unified service-record helpers. Read-only: the legacy `/api/browse`
+/// response above is intentionally left untouched (D-M5-7 / M5-PLAN 5.2).
+fn bounded_text(value: &str, limit: usize) -> String {
+    value.chars().take(limit).collect()
+}
+
+/// Days since 1970-01-01 -> (year, month, day), Howard Hinnant's civil calendar.
+fn civil_from_days_utc(days: i64) -> (i64, i64, i64) {
+    let z = days + 719_468;
+    let era = (if z >= 0 { z } else { z - 146_096 }) / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = mp + (if mp < 10 { 3 } else { -9 });
+    let year = y + (if month <= 2 { 1 } else { 0 });
+    (year, month, day)
+}
+
+fn rfc3339_from_epoch(ts: f64) -> String {
+    let secs = if ts.is_finite() && ts > 0.0 {
+        ts as i64
+    } else {
+        0
+    };
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
+    let (year, month, day) = civil_from_days_utc(days);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rem / 3_600,
+        (rem % 3_600) / 60,
+        rem % 60
+    )
+}
+
+/// Split an observed RDATA into the unified `address` / `port` pair.
+/// SRV RDATA is `priority weight port target`; A/AAAA/TXT become address-only.
+fn unified_target(value: &str) -> (String, u16) {
+    let text = value.trim();
+    if let Ok(ip) = text.parse::<std::net::IpAddr>() {
+        return (bounded_text(&ip.to_string(), 64), 0);
+    }
+    let parts: Vec<&str> = text.split_whitespace().collect();
+    if parts.len() >= 4 {
+        if let Ok(port) = parts[2].parse::<u16>() {
+            return (bounded_text(parts[3].trim_end_matches('.'), 64), port);
+        }
+    }
+    (bounded_text(text.trim_end_matches('.'), 64), 0)
+}
+
+/// `GET /api/browse/unified` — the same `contracts/service-record.json` shape
+/// emitted by `lan-ssdp`, with `source: "mdns"`.
+fn view_browse_unified(req: &Request, _: &Context) -> Response {
+    let engine = match engine_or_503(req) {
+        Ok(engine) => engine,
+        Err(response) => return response,
+    };
+    let items: Vec<String> = engine
+        .observed_snapshot()
+        .iter()
+        .map(|entry| {
+            let owner = bounded_text(entry.name.trim_end_matches('.'), 253);
+            let name = if owner.is_empty() {
+                "unnamed".to_string()
+            } else {
+                owner.clone()
+            };
+            let rtype = type_name(entry.rtype);
+            let service_type = if matches!(entry.rtype, 12 | 33) {
+                owner
+            } else {
+                rtype.to_string()
+            };
+            let service_type = if service_type.is_empty() {
+                rtype.to_string()
+            } else {
+                bounded_text(&service_type, 253)
+            };
+            let (address, port) = unified_target(&entry.value);
+            let ttl = u64::from(entry.ttl).min(86_400);
+            let attributes = format!(
+                "{{\"record\":{},\"owner\":{},\"value\":{}}}",
+                json_quote(rtype),
+                json_quote(&bounded_text(&entry.name, 253)),
+                json_quote(&bounded_text(&entry.value, 256))
+            );
+            let last_seen = rfc3339_from_epoch(entry.ts);
+            format!(
+                "{{\"name\":{},\"type\":{},\"address\":{},\"port\":{port},\"attributes\":{attributes},\"ttl\":{ttl},\"last_seen\":{},\"source\":\"mdns\"}}",
+                json_quote(&name),
+                json_quote(&service_type),
+                json_quote(&address),
+                json_quote(&last_seen)
+            )
+        })
+        .collect();
+    ok(
+        req,
+        &format!(
+            "{{\"items\":[{}],\"total\":{},\"source\":\"mdns\"}}",
+            items.join(","),
+            items.len()
         ),
     )
 }

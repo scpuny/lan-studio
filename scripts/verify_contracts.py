@@ -104,12 +104,14 @@ SCHEMA_FILES = {
     "alert-event": CONTRACTS / "alert-event.json",
     "log-record": CONTRACTS / "log-record.json",
     "snapshot": CONTRACTS / "snapshot.json",
+    "service-record": CONTRACTS / "service-record.json",
 }
 
 SAMPLE_PAIRS = [
     ("alert-event", "alert-event.sample.json"),
     ("log-record", "log-record.sample.json"),
     ("snapshot", "snapshot.sample.json"),
+    ("service-record", "service-record.sample.json"),
 ]
 
 REQUIRED_PATHS = [
@@ -125,6 +127,13 @@ REQUIRED_PATHS = [
     "/api/hosts/status",
     "/api/wol/devices", "/api/wol/device", "/api/wol/remove",
     "/api/wol/wake", "/api/wol/probe", "/api/wol/status", "/api/wol/history",
+    # M5 component endpoints (PRD 4.8 / 4.9 / 2.3)
+    "/api/sync/nodes", "/api/sync/status", "/api/sync/history",
+    "/api/sync/node", "/api/sync/remove", "/api/sync/pull",
+    "/api/sync/push", "/api/sync/confirm",
+    "/api/ssdp/devices", "/api/ssdp/snapshot", "/api/ssdp/status",
+    "/api/ssdp/refresh",
+    "/api/browse/unified", "/api/shell/status",
 ]
 
 MANDATORY_METRICS = [
@@ -146,6 +155,7 @@ REGISTERED_KINDS = [
     "cert_revoked", "cert_issued", "scan_anomaly", "sync_conflict",
     "device_wake_failed", "wol_wake_sent", "ssdp_discovery_error",
     "hosts_publish_failed", "hosts_conflict_detected",
+    "sync_node_unreachable", "shell_component_offline",
 ]
 
 

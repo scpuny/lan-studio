@@ -29,3 +29,7 @@ lan-hosts.mappings.json
 lan-wol.devices.json
 lan-wol.history.json
 lan-scan.results.json
+lan-sync.nodes.json
+lan-sync.history.json
+lan-ssdp.devices.json
+lan-shell.yaml

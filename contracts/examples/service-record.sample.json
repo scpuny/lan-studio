@@ -1,0 +1,13 @@
+{
+  "name": "living-room-speaker",
+  "type": "urn:schemas-upnp-org:device:MediaRenderer:1",
+  "address": "192.168.5.42",
+  "port": 1900,
+  "attributes": {
+    "usn": "uuid:4d696e69-4453-0000-0000-000000000000",
+    "server": "Linux/3.0 UPnP/1.0"
+  },
+  "ttl": 1800,
+  "last_seen": "2026-11-14T02:10:00Z",
+  "source": "ssdp"
+}

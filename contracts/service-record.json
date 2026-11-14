@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lan-studio.local/contracts/service-record.json",
+  "title": "Lan Studio unified service record",
+  "description": "Shared data model for service browsing. lan-ssdp emits these records; lan-mdns maps DNS-SD observations to the same shape on /api/browse/unified. Contract authority: PRD 4.9 / M5-PLAN 5.2.",
+  "type": "object",
+  "required": ["name", "type", "address", "port", "ttl", "last_seen", "source"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 253 },
+    "type": { "type": "string", "minLength": 1, "maxLength": 253 },
+    "address": { "type": "string", "maxLength": 64 },
+    "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "attributes": { "type": "object" },
+    "ttl": { "type": "integer", "minimum": 0, "maximum": 86400 },
+    "last_seen": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "enum": ["ssdp", "mdns"] }
+  }
+}

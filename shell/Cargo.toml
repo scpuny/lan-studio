@@ -1,0 +1,13 @@
+[package]
+name = "lan-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lan Studio Shell unified navigation exit (M5 aggregation layer, not a lan-* component)"
+
+[dependencies]
+# common-api re-exports Health / Registry, so the aggregation layer can build a
+# Context by hand without going through common-component::run (which would bind
+# GET / to the six-region component console and register 18 standard endpoints).
+common-api = { workspace = true }

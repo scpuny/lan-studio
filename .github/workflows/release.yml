@@ -7,6 +7,13 @@ on:
 permissions:
   contents: write
 
+# D-M5-9: deterministic build inputs. A fixed toolchain + SOURCE_DATE_EPOCH +
+# identical cargo flags give reproducible artifacts; bit-for-bit equality across
+# different hosts/toolchain patch versions is explicitly NOT promised.
+env:
+  SOURCE_DATE_EPOCH: "1735689600"
+  CARGO_TERM_COLOR: never
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,32 +26,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.82.0"
           targets: ${{ matrix.target }}
 
       - name: Install cross
         uses: taiki-e/install-action@cross
 
-      - name: Build static binary
-        run: cross build --release --target ${{ matrix.target }} -p lan-mdns
-
-      - name: Package and checksum
+      # 8 components (PRD 2.2) + lan-shell, which is the 9th binary but NOT a
+      # 9th component (aggregation layer, D-M5-10).
+      - name: Build all binaries for ${{ matrix.target }}
         run: |
           set -e
-          BIN="target/${{ matrix.target }}/release/lan-mdns"
-          test -f "$BIN"
-          file "$BIN" | grep -q 'statically linked'
-          NAME="lan-mdns-${{ github.ref_name }}-${{ matrix.target }}"
-          mkdir -p dist
-          cp "$BIN" dist/lan-mdns
-          cp components/lan-mdns/config.template.yaml dist/config.template.yaml
-          cp components/lan-mdns/README.md dist/README.md
+          BINS="lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell"
+          ARGS=""
+          for bin in $BINS; do ARGS="$ARGS -p $bin"; done
+          cross build --release --locked --target "${{ matrix.target }}" $ARGS
+
+      - name: Package with per-file sha256 manifest
+        run: |
+          set -e
+          BINS="lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell"
+          mkdir -p dist/bin dist/conf
+          for bin in $BINS; do
+            SRC="target/${{ matrix.target }}/release/$bin"
+            test -f "$SRC"
+            file "$SRC" | grep -q 'statically linked'
+            cp "$SRC" "dist/bin/$bin"
+            if [ -f "components/$bin/config.template.yaml" ]; then
+              cp "components/$bin/config.template.yaml" "dist/conf/$bin.config.template.yaml"
+            fi
+          done
+          cp shell/components.yaml dist/conf/shell-components.yaml
           cp README.md dist/PROJECT-README.md
+          cp docs/M5-CHECKLIST.md dist/M5-CHECKLIST.md
+          # Deterministic order -> stable SHA256SUMS.txt content.
+          (cd dist && find . -type f -print | LC_ALL=C sort | xargs sha256sum > SHA256SUMS.txt)
+          NAME="lan-studio-${{ github.ref_name }}-${{ matrix.target }}"
           tar -czf "$NAME.tar.gz" -C dist .
           sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256"
           echo "packaged $NAME.tar.gz"
+          cat "$NAME.tar.gz.sha256"
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2

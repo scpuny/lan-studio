@@ -145,4 +145,4 @@
 
 M4.0 ~ M4.4 全部 done；PRD §7.5 的「与 `lan-mdns` 无功能重叠、无强耦合」由 5 组运行态断言验证通过；统一契约对两个新组件逐项 ✅；M3 回归 66/66 无破坏；全量 CI 门禁全绿。**M4 可销项**，边界与不做部分见第 8 节。
 
-> 当前所有 M4 改动仍在工作区，**尚未 commit / push**；M2 离线产物 `common/webui/src/assets/index.html` 本次未改动（前端源码未变，`npm run verify` 产物与已提交版本一致）。
+> M4 全部改动已提交为 `2b5b259`（2026-11-14，**未 push**）；M2 离线产物 `common/webui/src/assets/index.html` 本次未改动（前端源码未变，`npm run verify` 产物与已提交版本一致）。
