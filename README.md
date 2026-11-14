@@ -43,6 +43,7 @@ lan-studio/
 │   ├── M3-CHECKLIST.md    # 其余 P0 三组件销项基线
 │   ├── M4-PLAN.md / M4-CHECKLIST.md    # P1 方案与销项
 │   ├── M5-PLAN.md / M5-CHECKLIST.md    # P2 + 统一出口方案与生态销项
+│   ├── M6-PLAN.md                  # 前端聚合方案（能力清单驱动，工程演进项）
 │   ├── METRICS.md  ALERT-SCHEMA.md  ERROR-CODES.md
 │   └── ADR/               # 0001 M1 … 0006 契约门禁 / 0007 M5 生态收敛
 ├── contracts/             # 机器可读契约（语言无关）
@@ -286,3 +287,7 @@ python3 scripts/test_api_contract.py
   `lan-mdns`，其余二进制由 `release.yml` 的 8×2 产物矩阵分发（登记在 ADR 0007）。
 - 前端两套壳（M2 的 Arco 单文件控制台与其余组件的原生 JS 六区域控制台）在 M5 有意
   并存，PRD §3.7 偏差继续有效，统一收敛另立项（ADR 0007）。
+- 前端聚合作为 **M6 工程演进项**推进（不改变 PRD §7.5 的 M0~M5 里程碑状态）：采用
+  能力清单驱动渲染，后端 `Hooks.routes` / `standard_routes` 引用了哪些模块，统一控制台
+  才生成对应的导航、面板与控件，未引用模块不产生 DOM。方案见
+  [`docs/M6-PLAN.md`](docs/M6-PLAN.md)。
