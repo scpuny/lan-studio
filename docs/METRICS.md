@@ -142,6 +142,8 @@ lanstudio_<c>_<metric>[_<unit>]
 
 ## 6. 验收清单
 
+> 本清单是**逐组件验收模板**，方框保留供每次验收现场勾选，不表示里程碑未完成。M2~M5 的实际销项结论与实测数字见各里程碑 `*-CHECKLIST.md`，生态级核对见 `scripts/test_ecosystem.py`（91/0）。
+
 - [ ] 组件启动后 `/api/metrics` 返回 200 且 `Content-Type: text/plain; version=0.0.4`
 - [ ] 第 2 节 9 项全部存在且类型正确
 - [ ] `lan-mdns` 第 3 节全部存在（M2 门禁）

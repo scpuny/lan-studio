@@ -122,5 +122,5 @@ lan-hosts --check --config lan-hosts.yaml
 - 不监听 5353、不加入组播组、不构造 / 应答 DNS 报文；
 - 不实现 HTTP 正向 / 反向代理或 Host 路由转发；
 - 不向 `lan-mdns`（或任何组件）推送映射，不读取其配置 / 快照 / API；
-- 不实现 ICMP / ARP 探测、远程控制、跨组件联动（留给 M5 统一出口）；
+- 不实现 ICMP / ARP 探测、远程控制、跨组件联动（M5 的 `lan-shell` 同样只做导航，本组件不参与联动）；
 - 不含任何第三方 crate、不使用 serde；JSON 与 hosts 文本均手写解析 / 序列化。

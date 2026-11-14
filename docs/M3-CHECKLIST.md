@@ -83,7 +83,7 @@
 ## 7. 已知边界 / 不做的部分
 
 - **不实现 P1 / P2**（`lan-hosts` / `lan-wol` / `lan-sync` / `lan-ssdp` 与统一出口归 M4 / M5）。
-- M3 控制台是 `common-component` 内的**原生 JS 自包含页**（沿用 Calm Console 设计令牌、六区域、深浅主题、零外部资源）；Arco 版统一壳收敛属于 M5 统一出口范围，已在 PRD §3.7 偏差登记。
+- M3 控制台是 `common-component` 内的**原生 JS 自包含页**（沿用 Calm Console 设计令牌、六区域、深浅主题、零外部资源）；Arco 版统一壳收敛**未在 M5 实施**，按 ADR 0007 D-M5-4 另立项，两套壳并存，已在 PRD §3.7 偏差登记。
 - `lan-relay` 多网卡严格选路依赖平台组播能力；macOS 上同端口通常只能绑定一个 socket，传输状态标为 `unavailable`/单 socket，但 API 与四道环路检测完整可用。
 - `lan-ca` 根密钥 / store 路径为进程级固定，热重载其余字段生效，改路径需重启。
 - `lan-scan` 只做 TCP 连通性探查（无 ICMP、无 UDP 扫描、无漏洞检测），结果不跨组件写入。
@@ -131,4 +131,4 @@
 
 M3.0 ~ M3.4 全部 done；`lan-relay` 环路检测 4 项硬性验收（含 60 秒环路压力测试无广播风暴）通过；统一契约对三个新组件逐项 ✅；全量 CI 门禁全绿。**M3 可销项**，边界与不做部分见第 7 节。
 
-> 注意：`common/webui/src/assets/index.html` 是编译进 Rust 二进制的离线产物，M2 前端改动后须一并提交；当前所有改动仍在工作区，尚未 commit。
+> 注意：`common/webui/src/assets/index.html` 是编译进 Rust 二进制的离线产物，M2 前端改动后须一并提交；该产物已随 M3 提交 `709879d` 一并入库，M4（`2b5b259`）与 M5（`9a9c4de`）均未改动它。

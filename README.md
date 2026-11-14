@@ -3,7 +3,7 @@
 > 内网轻量 ZeroConf 与局域网运维工具箱。
 > 8 个 `lan-*` 组件，统一契约、独立二进制、独立 WebUI、可单独部署。
 
-**当前状态：M5 完成 —— 8 个 `lan-*` 组件 + Lan Studio Shell 统一出口，PRD §8.2 生态级 DoD 六条通过**（2026-11-14）。
+**当前状态：M5 完成 —— 8 个 `lan-*` 组件 + Lan Studio Shell 统一出口，PRD §8.2 生态级 DoD 六条通过**（2026-11-14，提交 `9a9c4de`）。M5 是 PRD §7.5 定义的最后一个里程碑，全部 M0~M5 阶段均已销项。
 
 M2 管理台为 **Vue 3 + TypeScript + Arco Design** 六区域控制台，打包成单个自包含 HTML
 编入二进制；66 条功能逐条销项，运行态契约 74 项、冒烟 229 项，见
@@ -245,14 +245,16 @@ python3 scripts/test_api_contract.py
 
 ## 里程碑
 
-| 阶段 | 内容 | 状态 |
-| --- | --- | --- |
-| M0 | 契约冻结（本目录全部内容） | **完成** |
-| M1 | monorepo 骨架、`common-*` 最小集、CI、单文件产物 | **完成** |
-| M2 | `lan-mdns` 功能全集 66 条逐条销项 | **完成（66/66）** |
-| M3 | 其余 P0：`lan-relay` / `lan-ca` / `lan-scan` | **完成（环路检测 4/4）** |
-| M4 | P1：`lan-hosts` / `lan-wol` | **完成（无重叠 5/5）** |
-| M5 | P2：`lan-sync` / `lan-ssdp` + 统一出口 + 生态 DoD | **完成（生态六条全绿）** |
+| 阶段 | 内容 | 状态 | 销项依据 |
+| --- | --- | --- | --- |
+| M0 | 契约冻结（`contracts/` 全部机器可读文件） | **完成** | `scripts/verify_contracts.py` 24/0 |
+| M1 | monorepo 骨架、`common-*` 最小集、CI、单文件产物 | **完成** | `/healthz`、`build_info` 指标、离线 WebUI |
+| M2 | `lan-mdns` 功能全集 66 条逐条销项 | **完成（66/66）** | [`docs/M2-CHECKLIST.md`](docs/M2-CHECKLIST.md)，运行态契约 75/0、冒烟 229 项 |
+| M3 | 其余 P0：`lan-relay` / `lan-ca` / `lan-scan` | **完成（环路检测 4/4）** | [`docs/M3-CHECKLIST.md`](docs/M3-CHECKLIST.md)，`test_m3.py` 66/66，提交 `709879d` |
+| M4 | P1：`lan-hosts` / `lan-wol` | **完成（无重叠 5/5）** | [`docs/M4-CHECKLIST.md`](docs/M4-CHECKLIST.md)，`test_m4.py` 76/76，提交 `2b5b259` |
+| M5 | P2：`lan-sync` / `lan-ssdp` + 统一出口 + 生态 DoD | **完成（生态六条全绿）** | [`docs/M5-CHECKLIST.md`](docs/M5-CHECKLIST.md)，`test_m5.py` 与 `test_ecosystem.py` 各 91/0，提交 `9a9c4de` |
+
+全量门禁逐项数字以 [`docs/M5-CHECKLIST.md`](docs/M5-CHECKLIST.md) 第 9.1 节为准（fmt 0 diff、clippy 0 warning、单测 198 passed、静态契约 24/0、9 个二进制）。PRD §7.5 在 M5 之后没有后续阶段；尚未收敛的边界（前端两套壳、`install.sh` 只安装 `lan-mdns`）登记在 ADR 0007，不计入里程碑状态。
 
 ## 说明
 
