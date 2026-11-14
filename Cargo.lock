@@ -139,6 +139,7 @@ name = "lan-shell"
 version = "0.1.0"
 dependencies = [
  "common-api",
+ "common-auth",
 ]
 
 [[package]]

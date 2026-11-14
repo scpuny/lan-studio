@@ -1428,11 +1428,21 @@ fn view_auth_verify(req: &Request, _: &Context) -> Response {
 }
 
 fn view_index(_: &Request, ctx: &Context) -> Response {
-    if ctx.webui {
-        Response::html(200, INDEX_HTML.to_string())
-    } else {
-        Response::text(404, "webui disabled".to_string())
+    if !ctx.webui {
+        return Response::text(404, "webui disabled".to_string());
     }
+    // M2 keeps its Arco console (D-M6-2). Its capability manifest is still
+    // delivered with the page so the aggregated Shell can read it; the Arco
+    // page itself does not render from it.
+    let caps: &str = include_str!("../../../contracts/examples/capabilities.lan-mdns.sample.json");
+    let script = format!(
+        "<script>window.__LAN_CAPABILITIES__={};</script>",
+        caps.replace("</", "<\\/")
+    );
+    Response::html(
+        200,
+        INDEX_HTML.replacen("</head>", &format!("{script}</head>"), 1),
+    )
 }
 
 fn view_records(req: &Request, _: &Context) -> Response {

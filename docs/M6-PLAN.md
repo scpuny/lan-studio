@@ -1,7 +1,14 @@
 # M6 前端聚合方案：能力清单驱动的统一控制台
 
 > 依据：用户指令「前端聚合，但要根据后端引用的模块展示所需的页面元素」。
-> 状态：**方案已落档，待拍板**（2026-11-14）。本文是 M6 的范围依据，逐条销项与实测数字另建 `docs/M6-CHECKLIST.md`。
+> 状态：**已拍板并实施完成**（2026-11-14）。用户选定 D-M6-1 = **A（统一 SPA + Shell 同源代理）**、D-M6-2 = **保留并挂载 M2 Arco 页**。
+> 逐条销项与实测数字见 `docs/M6-CHECKLIST.md`，决策登记见 `docs/ADR/0008-m6-frontend-aggregation.md`。
+>
+> **实施与本文初稿 §6 的三点差异（以代码为准）**：
+> ① 能力清单**不侵入 `Hooks`**，改由 `scripts/gen_capabilities.py` 反向扫描各组件 `.route()` 生成静态 JSON + `capabilities.allowlist.txt`，CI 强制「清单 = 后端实际引用」，零 Rust 侵入、零新增端点；
+> ② 前端**不新建 `common/console/` Vite 工程**，就地升级 `common/component/src/assets/console.html`，渲染器 `console-renderer.js` 由组件控制台与 Shell 共用同一份源文件，保持零构建链；
+> ③ `lan-mdns` 的 Arco 页以 iframe 直连组件端口挂载（唯一例外），其余 7 个组件与 Shell 走能力驱动渲染 + 同源代理。
+> 其余范围、边界与「M2~M5 门禁不回退」的要求不变。
 > 边界：不改 M0 冻结契约、不改 PRD §7.5 的 M0~M5 里程碑状态（M5 仍是规格书的最后一个阶段），M6 是**工程演进项**而非规格新增阶段。
 
 ---
@@ -351,6 +358,8 @@ function createApi(baseFor) {
 
 ### 6.1 `common/component`：能力声明与注入
 
+> **以下为初稿代码骨架，实际未采用**（避免侵入 7 个组件的 `Hooks`）。落地做法：`scripts/gen_capabilities.py` 生成 8 份 sample + allowlist，`common/component/src/capabilities.rs` 用 `include_str!` 编入，`view_index` 用 `CONSOLE_HTML.replace("__CAPABILITIES__", caps).replace("__RENDERER_JS__", RENDERER_JS)` 注入；`lan-mdns::view_index` 把清单作为 `window.__LAN_CAPABILITIES__` 注入 Arco 页。
+
 ```rust
 // common/component/src/capabilities.rs（新增）
 #[derive(Clone, Copy)]
@@ -483,11 +492,12 @@ fn view_proxy(req: &Request, ctx: &Context) -> Response {
 ```
 cargo fmt --all -- --check              0 diff
 cargo clippy --workspace --all-targets -- -D warnings   0 warning
-cargo test --workspace                 198 passed 起，只增不减
-verify_contracts.py                    24 / 0（新 schema 加入后 +2）
+cargo test --workspace                 201 passed（M5 收尾 198 → +3）
+verify_contracts.py                    34 / 0（新增 capabilities schema + 8 份 sample）
 test_api_contract.py                   75 / 0
 test_m3.py / test_m4.py               66/66、76/76
 test_m5.py / test_ecosystem.py        91 / 0、91 / 0（18 统一端点不变）
+gen_capabilities.py --check            CAPABILITIES OK（8 manifests）
 npm run verify（M2 webui）            RENDER OK
 cargo build --workspace                9 binaries
 ```
@@ -497,7 +507,7 @@ cargo build --workspace                9 binaries
 | 门禁 | 判定 |
 | --- | --- |
 | `scripts/verify_capabilities.py` | 8 份 sample 通过 schema；所有 endpoint 在 openapi 中；`write` 标记与 `route_write` 一致；manifest `modules` 与源码一致；widget/icon 均在注册表 |
-| `scripts/test_m6.py` | 逐组件断言「清单里没有的模块，DOM 里也不存在」，含负向断言（例如 `lan-hosts` 页面不得出现 `/api/wol/` 相关控件） |
+| `scripts/test_m6.py` | **152 / 0**：清单与后端路由一致、每组件无外模块、组件控制台与 Shell 注入完整、代理白名单/未知组件/非 api 前缀/裸 `/api/*` 全部 404、写操作密码头透传并成功写入 |
 | 代理安全 | 白名单外的路径 404；目标 host 不可由请求指定；超时与体积上界生效；`/p/` 路径同样受 AdminToken 保护 |
 | 前端产物 | 单文件、零外链、深浅主题、内联 SVG 图标 |
 
@@ -513,12 +523,12 @@ cargo build --workspace                9 binaries
 
 ---
 
-## 10. 待拍板（确认后开工）
+## 10. 拍板结果与实施结论（2026-11-14）
 
-| # | 问题 | 选项 |
-| --- | --- | --- |
-| ★1 | 聚合入口形态 | **A 统一 SPA + Shell 同源代理（推荐）** / B 各组件内嵌同一份壳、Shell 只做导航 / C 浏览器跨域直连（8 组件加 CORS） |
-| ★2 | M2 Arco 前端 | **保留并挂载（推荐）** / 完全重写为共享壳 / 本轮不动、留到 M6.4 之后 |
-| ★3 | 清单粒度 | **五层 component→area→module→panel→action/field（推荐）** / 只到 module 层（前端手写面板） |
+| # | 问题 | 用户选择 | 落地情况 |
+| --- | --- | --- | --- |
+| ★1 | 聚合入口形态 | **A 统一 SPA + Shell 同源代理** | `common-api::route_prefix` + `lan-shell::view_proxy`，组件/端点双层白名单，5s 超时、1 MiB 上界 |
+| ★2 | M2 Arco 前端 | **保留并挂载** | 838 kB 产物未改、66/66 未重跑即保持；聚合页以 iframe 直连组件端口，`window.__LAN_CAPABILITIES__` 注入清单 |
+| ★3 | 清单粒度 | 五层 `component→area→module→panel→action/field` | `contracts/capabilities.schema.json` + 8 份 sample，`console-renderer.js` 按 panel.widget / action.fields 生成 DOM |
 
-未拍板前不落地代码；本文件与 README 的指引更新是唯一改动。
+M6.0 ~ M6.3 已交付，M6.4 全量门禁与提交见 `docs/M6-CHECKLIST.md` 第 9 节。**M6 不改变 PRD §7.5 的 M0~M5 里程碑状态**（M5 仍是规格书最后一个阶段）。

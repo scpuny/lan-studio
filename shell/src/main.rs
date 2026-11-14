@@ -10,18 +10,43 @@
 //! - `GET /api/shell/status`  bounded component online state
 //!
 //! Security boundary: Shell only *forwards* an optional AdminToken to the
-//! component pages in the browser. It never asks for, stores or transmits an
-//! administrator password, never proxies component requests and never acts as
-//! a data bus.
+//! component pages in the browser. It never stores an administrator password.
+//!
+//! M6 adds a bounded same-origin proxy (`/p/<name>/api/...`) so the aggregated
+//! SPA can reach every component without cross-origin requests. The proxy is
+//! component- and endpoint-allowlisted, timeout- and size-bounded, and never
+//! stores credentials: `X-Admin-Password` is forwarded verbatim to the target,
+//! which enforces its own write guard. Shell still does no service discovery
+//! and does not act as a data bus.
 
 use common_api::{err, json_quote, ok, App, Context, Health, Registry, Request, Response};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const SHELL_HTML: &str = include_str!("assets/shell.html");
+/// One renderer source, shared with every component console (zero build chain).
+const RENDERER_JS: &str = include_str!("../../common/component/src/assets/console-renderer.js");
+/// Capability manifests are the single source of truth for the aggregated UI.
+const CAPABILITIES: [&str; 8] = [
+    include_str!("../../contracts/examples/capabilities.lan-mdns.sample.json"),
+    include_str!("../../contracts/examples/capabilities.lan-relay.sample.json"),
+    include_str!("../../contracts/examples/capabilities.lan-ca.sample.json"),
+    include_str!("../../contracts/examples/capabilities.lan-scan.sample.json"),
+    include_str!("../../contracts/examples/capabilities.lan-hosts.sample.json"),
+    include_str!("../../contracts/examples/capabilities.lan-wol.sample.json"),
+    include_str!("../../contracts/examples/capabilities.lan-sync.sample.json"),
+    include_str!("../../contracts/examples/capabilities.lan-ssdp.sample.json"),
+];
+/// `name|path` lines generated from the manifests; keeps the Rust side free of
+/// a JSON parser and prevents forwarding to undeclared endpoints.
+const ALLOWLIST: &str = include_str!("../../contracts/capabilities.allowlist.txt");
+/// Bounded, but long enough for a write request whose admin-password KDF runs
+/// in a debug build. Health probes keep their own 300ms budget.
+const PROXY_TIMEOUT_MS: u64 = 5_000;
+const PROXY_MAX_BYTES: usize = 1 << 20;
 const DEFAULT_PORT: u16 = 8090;
 const DEFAULT_MANIFEST: &str = "shell/components.yaml";
 const MAX_COMPONENTS: usize = 32;
@@ -40,10 +65,16 @@ Options:
   --version   Print the version and exit
   --help      Print this help and exit
 
+Routes:
+  GET  /                       aggregated SPA (8 components, capability-driven)
+  GET  /healthz                liveness
+  GET  /api/shell/status       bounded online state
+  GET|POST /p/<name>/api/...   same-origin proxy, allowlisted + bounded
+
 Environment:
   LAN_SHELL_CONFIG   manifest path (default: shell/components.yaml)
   LAN_STUDIO_PORT    listen port   (default: 8090)
-  LAN_SHELL_TOKEN    optional admin token required for /api/* (default: empty)
+  LAN_SHELL_TOKEN    optional admin token required for /api/* and /p/* (default: empty)
 ";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -127,22 +158,23 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        if let Some(rest) = trimmed.strip_prefix("- ") {
+        if let Some(value) = trimmed.strip_prefix("- name:") {
             if let Some(item) = current.take() {
                 push_component(&mut manifest, item)?;
             }
-            let (key, value) =
-                split_kv(rest).ok_or_else(|| "malformed manifest list item".to_string())?;
-            if key != "name" {
-                return Err("manifest list item must start with `name`".to_string());
-            }
+            let name = value.trim().to_string();
             current = Some(Component {
-                name: value.clone(),
-                label: value,
+                name: name.clone(),
+                label: name,
                 port: 0,
                 icon: "cube".to_string(),
                 tone: "blue".to_string(),
             });
+            continue;
+        }
+        // Nested `- <module-id>` lines under `modules:` are capability
+        // metadata consumed by scripts/gen_capabilities.py, not components.
+        if trimmed.starts_with("- ") {
             continue;
         }
         let (key, value) = match split_kv(trimmed) {
@@ -235,14 +267,20 @@ fn component_json(item: &Component) -> String {
     )
 }
 
+fn capabilities_json() -> String {
+    let items: Vec<&str> = CAPABILITIES.iter().map(|text| text.trim()).collect();
+    format!("[{}]", items.join(","))
+}
+
 fn manifest_data_json(manifest: &Manifest) -> String {
     let items: Vec<String> = manifest.components.iter().map(component_json).collect();
     format!(
-        "{{\"version\":{},\"probe_enabled\":{},\"probe_interval_seconds\":{},\"components\":[{}]}}",
+        "{{\"version\":{},\"probe_enabled\":{},\"probe_interval_seconds\":{},\"components\":[{}],\"capabilities\":{}}}",
         manifest.version,
         manifest.probe_enabled,
         manifest.probe_interval_seconds,
-        items.join(",")
+        items.join(","),
+        capabilities_json()
     )
 }
 
@@ -316,8 +354,127 @@ fn view_index(_req: &Request, ctx: &Context) -> Response {
         Ok(manifest) => manifest,
         Err(_) => Manifest::defaults(),
     };
-    let html = SHELL_HTML.replace("__SHELL_DATA__", &manifest_data_json(&manifest));
+    let html = SHELL_HTML
+        .replace("__SHELL_DATA__", &manifest_data_json(&manifest))
+        .replace("__RENDERER_JS__", RENDERER_JS);
     Response::html(200, html)
+}
+
+/// Same-origin, allowlisted, bounded proxy for the aggregated SPA.
+/// The target host is always 127.0.0.1:<manifest port>; credentials are only
+/// forwarded, never stored, and the write guard stays in the target component.
+fn view_proxy(req: &Request, ctx: &Context) -> Response {
+    if common_auth::check(
+        &req.headers,
+        &req.query,
+        &ctx.admin_token,
+        req.peer.ip().is_loopback(),
+    )
+    .is_err()
+    {
+        return err(req, "auth_failed", "invalid admin token", 403);
+    }
+    let rest = req.path.strip_prefix("/p/").unwrap_or("");
+    let mut parts = rest.splitn(2, '/');
+    let name = parts.next().unwrap_or("");
+    let tail = parts.next().unwrap_or("");
+    if name.is_empty() || !tail.starts_with("api/") || tail.contains("..") || tail.len() > 256 {
+        return err(req, "not_found", "unknown proxy target", 404);
+    }
+    let manifest = match parse_manifest(&ctx.config_raw) {
+        Ok(manifest) => manifest,
+        Err(error) => return err(req, "internal_error", &error, 500),
+    };
+    let component = match manifest.components.iter().find(|c| c.name == name) {
+        Some(component) => component,
+        None => return err(req, "not_found", "unknown component", 404),
+    };
+    let target_path = format!("/{tail}");
+    let key = format!("{name}|{target_path}");
+    if !ALLOWLIST.lines().any(|line| line == key) {
+        return err(
+            req,
+            "not_found",
+            "endpoint not declared in capabilities",
+            404,
+        );
+    }
+
+    let timeout = Duration::from_millis(PROXY_TIMEOUT_MS);
+    let addr = SocketAddr::from(([127, 0, 0, 1], component.port));
+    let mut stream = match TcpStream::connect_timeout(&addr, timeout) {
+        Ok(stream) => stream,
+        Err(_) => return err(req, "target_unreachable", "component is offline", 502),
+    };
+    if stream.set_read_timeout(Some(timeout)).is_err()
+        || stream.set_write_timeout(Some(timeout)).is_err()
+    {
+        return err(
+            req,
+            "target_unreachable",
+            "socket timeout setup failed",
+            502,
+        );
+    }
+    let query = if req.query.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", req.query)
+    };
+    let body = if req.method == "POST" {
+        req.body.as_str()
+    } else {
+        ""
+    };
+    let mut raw = format!(
+        "{} {}{} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n",
+        req.method, target_path, query, component.port
+    );
+    for (header, forwarded) in [
+        ("content-type", "Content-Type"),
+        ("x-admin-password", "X-Admin-Password"),
+        ("x-admin-token", "X-Admin-Token"),
+    ] {
+        if let Some(value) = req.headers.get(header) {
+            raw.push_str(&format!("{forwarded}: {value}\r\n"));
+        }
+    }
+    raw.push_str(&format!("Content-Length: {}\r\n\r\n{}", body.len(), body));
+    if stream.write_all(raw.as_bytes()).is_err() {
+        return err(req, "target_unreachable", "forward failed", 502);
+    }
+
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                buf.extend_from_slice(&chunk[..n]);
+                if buf.len() > PROXY_MAX_BYTES {
+                    return err(req, "internal_error", "response too large", 502);
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    let text = String::from_utf8_lossy(&buf);
+    let split = text.find("\r\n\r\n").unwrap_or(text.len());
+    let (head, remainder) = text.split_at(split);
+    let body_text = remainder.strip_prefix("\r\n\r\n").unwrap_or(remainder);
+    let status = head
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|code| code.parse::<u16>().ok())
+        .unwrap_or(502);
+    let content_type = head
+        .lines()
+        .find(|line| line.to_ascii_lowercase().starts_with("content-type:"))
+        .and_then(|line| line.split_once(':'))
+        .map(|(_, value)| value.trim().to_string())
+        .unwrap_or_else(|| "application/json; charset=utf-8".to_string());
+    Response::body(status, &content_type, body_text.to_string())
 }
 
 fn view_healthz(_req: &Request, _ctx: &Context) -> Response {
@@ -453,7 +610,9 @@ fn main() {
     let app = App::new()
         .route("GET", "/", view_index)
         .route("GET", "/healthz", view_healthz)
-        .route("GET", "/api/shell/status", view_status);
+        .route("GET", "/api/shell/status", view_status)
+        .route_prefix("GET", "/p/", view_proxy)
+        .route_prefix("POST", "/p/", view_proxy);
     let addr = format!("127.0.0.1:{port}");
     if let Err(error) = app.serve(&addr, ctx) {
         eprintln!("lan-shell failed to listen on {addr}: {error}");
@@ -562,7 +721,11 @@ mod tests {
                 "external resource or password field: {forbidden}"
             );
         }
-        assert!(html.contains("ls-tone-bar"));
+        // M6: the eight cards became a capability-driven single-page console.
+        assert!(html.contains("ls-pill"));
+        assert!(html.contains("window.LanConsole"));
+        assert!(html.contains("\"capabilities\":["));
+        assert!(!html.contains("__RENDERER_JS__"));
         assert!(html.contains("localStorage"));
     }
 

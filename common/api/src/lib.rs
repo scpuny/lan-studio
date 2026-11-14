@@ -119,6 +119,9 @@ struct Route {
     handler: Handler,
     /// Protected by the admin password in addition to the admin token.
     write: bool,
+    /// Prefix route: matches `starts_with(path)`. Used by the Shell proxy only.
+    /// Exact routes always win, and the metrics `path` label stays bounded.
+    prefix: bool,
 }
 
 #[derive(Clone, Default)]
@@ -137,6 +140,7 @@ impl App {
             path: path.to_string(),
             handler,
             write: false,
+            prefix: false,
         });
         self
     }
@@ -149,6 +153,26 @@ impl App {
             path: path.to_string(),
             handler,
             write: true,
+            prefix: false,
+        });
+        self
+    }
+
+    /// Register a prefix route (M6 Shell same-origin proxy). Prefix routes are
+    /// never write-protected here: the proxy handler performs its own auth and
+    /// forwards the password header to the target component, which enforces it.
+    pub fn route_prefix(
+        mut self,
+        method: &'static str,
+        prefix: &'static str,
+        handler: Handler,
+    ) -> Self {
+        self.routes.push(Route {
+            method,
+            path: prefix.to_string(),
+            handler,
+            write: false,
+            prefix: true,
         });
         self
     }
@@ -164,14 +188,30 @@ impl App {
     fn route_label(&self, req: &Request) -> String {
         self.routes
             .iter()
-            .find(|route| route.method == req.method && route.path == req.path)
+            .find(|route| !route.prefix && route.method == req.method && route.path == req.path)
+            .or_else(|| {
+                self.routes.iter().find(|route| {
+                    route.prefix
+                        && route.method == req.method
+                        && req.path.starts_with(route.path.as_str())
+                })
+            })
             .map(|route| route.path.clone())
             .unwrap_or_else(|| "/unmatched".to_string())
     }
 
     pub fn dispatch(&self, req: &Request, ctx: &Context) -> Response {
+        // Exact routes always win over prefix routes.
         for route in &self.routes {
-            if route.method == req.method && route.path == req.path {
+            if !route.prefix && route.method == req.method && route.path == req.path {
+                return (route.handler)(req, ctx);
+            }
+        }
+        for route in &self.routes {
+            if route.prefix
+                && route.method == req.method
+                && req.path.starts_with(route.path.as_str())
+            {
                 return (route.handler)(req, ctx);
             }
         }

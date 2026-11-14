@@ -105,6 +105,8 @@ SCHEMA_FILES = {
     "log-record": CONTRACTS / "log-record.json",
     "snapshot": CONTRACTS / "snapshot.json",
     "service-record": CONTRACTS / "service-record.json",
+    # M6: frontend capability manifest (compiled from backend route registrations)
+    "capabilities": CONTRACTS / "capabilities.schema.json",
 }
 
 SAMPLE_PAIRS = [
@@ -112,6 +114,14 @@ SAMPLE_PAIRS = [
     ("log-record", "log-record.sample.json"),
     ("snapshot", "snapshot.sample.json"),
     ("service-record", "service-record.sample.json"),
+    ("capabilities", "capabilities.lan-mdns.sample.json"),
+    ("capabilities", "capabilities.lan-relay.sample.json"),
+    ("capabilities", "capabilities.lan-ca.sample.json"),
+    ("capabilities", "capabilities.lan-scan.sample.json"),
+    ("capabilities", "capabilities.lan-hosts.sample.json"),
+    ("capabilities", "capabilities.lan-wol.sample.json"),
+    ("capabilities", "capabilities.lan-sync.sample.json"),
+    ("capabilities", "capabilities.lan-ssdp.sample.json"),
 ]
 
 REQUIRED_PATHS = [

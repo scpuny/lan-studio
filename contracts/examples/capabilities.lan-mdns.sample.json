@@ -1,0 +1,298 @@
+{
+  "schema": 1,
+  "component": "lan-mdns",
+  "runtime": "standalone",
+  "libs": [],
+  "modules": [
+    {
+      "id": "core.status",
+      "title": "状态总览",
+      "icon": "grid",
+      "tone": "blue",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "status.kv",
+          "title": "运行状态",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/status"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.config",
+      "title": "配置管理",
+      "icon": "sliders",
+      "tone": "indigo",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "config.editor",
+          "title": "配置编辑器",
+          "widget": "code-editor",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config"
+          },
+          "actions": [
+            {
+              "id": "save",
+              "label": "校验并保存",
+              "method": "POST",
+              "path": "/api/config",
+              "write": true
+            },
+            {
+              "id": "reload",
+              "label": "重新载入",
+              "method": "POST",
+              "path": "/api/reload",
+              "write": true
+            },
+            {
+              "id": "export",
+              "label": "导出快照",
+              "method": "GET",
+              "path": "/api/config/snapshot"
+            },
+            {
+              "id": "import",
+              "label": "导入快照",
+              "method": "POST",
+              "path": "/api/config/snapshot",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "core.observe",
+      "title": "可观测",
+      "icon": "activity",
+      "tone": "cyan",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "observe.metrics",
+          "title": "Prometheus 指标",
+          "widget": "text-view",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/metrics"
+          }
+        },
+        {
+          "id": "observe.logs",
+          "title": "最近日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.logs",
+      "title": "日志",
+      "icon": "terminal",
+      "tone": "teal",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "logs.list",
+          "title": "运行日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.alerts",
+      "title": "告警",
+      "icon": "bell",
+      "tone": "amber",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "alerts.kv",
+          "title": "告警通道",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/alerts"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.history",
+      "title": "版本历史",
+      "icon": "history",
+      "tone": "purple",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "history.list",
+          "title": "快照与回滚",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config/history"
+          },
+          "actions": [
+            {
+              "id": "rollback",
+              "label": "回滚",
+              "method": "POST",
+              "path": "/api/config/rollback",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lan-mdns.records",
+      "title": "资源记录",
+      "icon": "dns",
+      "tone": "blue",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "records.table",
+          "title": "已发布记录",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/records"
+          },
+          "columns": [
+            {
+              "key": "name",
+              "label": "名称"
+            },
+            {
+              "key": "type",
+              "label": "类型"
+            },
+            {
+              "key": "value",
+              "label": "值"
+            }
+          ]
+        },
+        {
+          "id": "records.interfaces",
+          "title": "网卡",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/interfaces"
+          }
+        },
+        {
+          "id": "records.queries",
+          "title": "查询审计",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/queries"
+          }
+        },
+        {
+          "id": "records.probe",
+          "title": "主动探测",
+          "widget": "action-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/browse"
+          },
+          "actions": [
+            {
+              "id": "probe",
+              "label": "发起探测",
+              "method": "POST",
+              "path": "/api/probe",
+              "fields": [
+                {
+                  "key": "name",
+                  "label": "名称",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "key": "type",
+                  "label": "类型",
+                  "type": "text",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lan-mdns.browse",
+      "title": "服务浏览",
+      "icon": "discover",
+      "tone": "cyan",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "browse.table",
+          "title": "统一服务记录",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/browse/unified"
+          },
+          "columns": [
+            {
+              "key": "name",
+              "label": "名称"
+            },
+            {
+              "key": "type",
+              "label": "类型"
+            },
+            {
+              "key": "address",
+              "label": "地址"
+            },
+            {
+              "key": "source",
+              "label": "来源"
+            }
+          ]
+        },
+        {
+          "id": "browse.conflicts",
+          "title": "冲突检测",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/conflicts"
+          }
+        },
+        {
+          "id": "browse.targets",
+          "title": "健康目标",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/health/targets"
+          }
+        }
+      ]
+    }
+  ]
+}

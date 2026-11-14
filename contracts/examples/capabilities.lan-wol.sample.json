@@ -1,0 +1,297 @@
+{
+  "schema": 1,
+  "component": "lan-wol",
+  "runtime": "common-component",
+  "libs": [
+    "common-component",
+    "common-probe"
+  ],
+  "modules": [
+    {
+      "id": "core.status",
+      "title": "状态总览",
+      "icon": "grid",
+      "tone": "blue",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "status.kv",
+          "title": "运行状态",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/status"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.config",
+      "title": "配置管理",
+      "icon": "sliders",
+      "tone": "indigo",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "config.editor",
+          "title": "配置编辑器",
+          "widget": "code-editor",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config"
+          },
+          "actions": [
+            {
+              "id": "save",
+              "label": "校验并保存",
+              "method": "POST",
+              "path": "/api/config",
+              "write": true
+            },
+            {
+              "id": "reload",
+              "label": "重新载入",
+              "method": "POST",
+              "path": "/api/reload",
+              "write": true
+            },
+            {
+              "id": "export",
+              "label": "导出快照",
+              "method": "GET",
+              "path": "/api/config/snapshot"
+            },
+            {
+              "id": "import",
+              "label": "导入快照",
+              "method": "POST",
+              "path": "/api/config/snapshot",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "core.observe",
+      "title": "可观测",
+      "icon": "activity",
+      "tone": "cyan",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "observe.metrics",
+          "title": "Prometheus 指标",
+          "widget": "text-view",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/metrics"
+          }
+        },
+        {
+          "id": "observe.logs",
+          "title": "最近日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.logs",
+      "title": "日志",
+      "icon": "terminal",
+      "tone": "teal",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "logs.list",
+          "title": "运行日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.alerts",
+      "title": "告警",
+      "icon": "bell",
+      "tone": "amber",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "alerts.kv",
+          "title": "告警通道",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/alerts"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.history",
+      "title": "版本历史",
+      "icon": "history",
+      "tone": "purple",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "history.list",
+          "title": "快照与回滚",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config/history"
+          },
+          "actions": [
+            {
+              "id": "rollback",
+              "label": "回滚",
+              "method": "POST",
+              "path": "/api/config/rollback",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lan-wol.devices",
+      "title": "唤醒设备",
+      "icon": "power",
+      "tone": "amber",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "wol.devices",
+          "title": "已登记设备",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/wol/devices"
+          },
+          "columns": [
+            {
+              "key": "name",
+              "label": "名称"
+            },
+            {
+              "key": "mac",
+              "label": "MAC"
+            },
+            {
+              "key": "state",
+              "label": "状态"
+            }
+          ],
+          "actions": [
+            {
+              "id": "upsert",
+              "label": "登记设备",
+              "method": "POST",
+              "path": "/api/wol/device",
+              "fields": [
+                {
+                  "key": "device_id",
+                  "label": "设备 ID",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "key": "mac",
+                  "label": "MAC",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            },
+            {
+              "id": "remove",
+              "label": "移除",
+              "method": "POST",
+              "path": "/api/wol/remove",
+              "fields": [
+                {
+                  "key": "device_id",
+                  "label": "设备 ID",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            },
+            {
+              "id": "wake",
+              "label": "唤醒",
+              "method": "POST",
+              "path": "/api/wol/wake",
+              "fields": [
+                {
+                  "key": "device_id",
+                  "label": "设备 ID",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            }
+          ]
+        },
+        {
+          "id": "wol.status",
+          "title": "组件状态",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/wol/status"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lan-wol.probe",
+      "title": "电源状态探测",
+      "icon": "activity",
+      "tone": "green",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "wol.probe",
+          "title": "只读 TCP 探测",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/wol/status"
+          },
+          "actions": [
+            {
+              "id": "probe",
+              "label": "重新探测",
+              "method": "POST",
+              "path": "/api/wol/probe",
+              "write": true
+            }
+          ]
+        },
+        {
+          "id": "wol.history",
+          "title": "唤醒审计",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/wol/history"
+          }
+        }
+      ],
+      "requires_lib": "common-probe"
+    }
+  ]
+}

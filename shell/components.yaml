@@ -10,38 +10,111 @@ components:
     port: 8080
     icon: dns
     tone: blue
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-mdns.records
+      - lan-mdns.browse
   - name: lan-relay
     label: 跨网段中继
     port: 8081
     icon: relay
     tone: cyan
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-relay.stats
+      - lan-relay.inject
   - name: lan-ca
     label: 内网凭证
     port: 8082
     icon: cert
     tone: purple
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-ca.root
+      - lan-ca.certs
+      - lan-ca.audit
   - name: lan-scan
     label: 资产探查
     port: 8083
     icon: scan
     tone: teal
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-scan.status
+      - lan-scan.results
   - name: lan-hosts
     label: 静态名字映射
     port: 8084
     icon: hosts
     tone: indigo
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-hosts.mappings
+      - lan-hosts.render
   - name: lan-wol
     label: 网络唤醒
     port: 8085
     icon: power
     tone: amber
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-wol.devices
+      - lan-wol.probe
   - name: lan-sync
     label: 配置同步
     port: 8086
     icon: sync
     tone: green
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-sync.nodes
+      - lan-sync.transfer
   - name: lan-ssdp
     label: 设备发现
     port: 8087
     icon: discover
     tone: orange
+    modules:
+      - core.status
+      - core.config
+      - core.observe
+      - core.logs
+      - core.alerts
+      - core.history
+      - lan-ssdp.devices
+      - lan-ssdp.snapshot

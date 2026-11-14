@@ -140,8 +140,11 @@ button,input,textarea,select{font:inherit;color:inherit}
         <div class="ls-list"><div class="ls-list-row ls-list-head"><span>时间</span><span>原因</span><span>大小</span><span>操作</span></div><div id="historyRows"></div></div>
       </div>
     </section>
+    <div id="moduleRoot"></div>
   </main>
 </div>
+<script>const CAPS = __CAPABILITIES__;</script>
+<script>__RENDERER_JS__</script>
 <script>
 (function(){
   var ICONS={
@@ -186,7 +189,7 @@ button,input,textarea,select{font:inherit;color:inherit}
     PAGES.forEach(function(p){var b=ce('button');b.className='ls-nav-item'+(state.page===p.k?' on':'');b.innerHTML=svg(p.i)+'<span>'+esc(p.t)+'</span>';b.onclick=function(){go(p.k);};nav.appendChild(b);});
   }
   function go(k){
-    state.page=k;renderNav();
+    state.page=k;
     var p=PAGES.filter(function(x){return x.k===k;})[0];
     q('#pageTitle').textContent=p.t;q('#pageSub').textContent=p.s+' · '+state.component;
     document.querySelectorAll('section[data-page]').forEach(function(s){s.hidden=s.getAttribute('data-page')!==k;});
@@ -244,7 +247,7 @@ button,input,textarea,select{font:inherit;color:inherit}
     }catch(e){flash(String(e.message),true);}
   }
   function load(k){if(k==='overview')loadStatus();if(k==='config')loadConfig();if(k==='observe'){loadMetrics();loadLogs();}if(k==='logs')loadLogs();if(k==='alerts')loadAlerts();if(k==='history')loadHistory();}
-  q('#refreshBtn').onclick=function(){load(state.page);flash('已刷新');};
+  q('#refreshBtn').onclick=function(){ctl.reload();flash('已刷新');};
   q('#logRefresh').onclick=loadLogs;q('#logLevel').onchange=loadLogs;q('#historyRefresh').onclick=loadHistory;
   q('#themeBtn').onclick=function(){var now=document.documentElement.getAttribute('theme')==='dark'?'light':'dark';document.documentElement.setAttribute('theme',now);try{localStorage.setItem('ls-theme',now);}catch(e){}};
   try{var saved=localStorage.getItem('ls-theme');if(saved)document.documentElement.setAttribute('theme',saved);}catch(e){}
@@ -252,7 +255,17 @@ button,input,textarea,select{font:inherit;color:inherit}
   q('#reloadBtn').onclick=function(){api('/api/reload',{method:'POST',write:true,body:'{}'}).then(function(){flash('已重新载入');}).catch(function(e){flash(e.message,true);});};
   q('#exportBtn').onclick=function(){api('/api/config/snapshot?reason=manual').then(function(s){var blob=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});var a=ce('a');a.href=URL.createObjectURL(blob);a.download=state.component+'-snapshot.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);flash('快照已导出（不含凭据）');}).catch(function(e){flash(e.message,true);});};
   q('#importFile').onchange=function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){api('/api/config/snapshot',{method:'POST',write:true,body:String(rd.result)}).then(function(){flash('快照已导入');loadConfig();loadHistory();}).catch(function(x){flash(x.message,true);});};rd.readAsText(f);e.target.value='';};
-  renderNav();go('overview');setInterval(function(){if(state.page==='overview')loadStatus();},5000);
+  window.__ls={go:go,load:load};
+  var ctl=LanConsole.render(CAPS,{
+    coreStatic:true,
+    container:q('#moduleRoot'),
+    navEl:q('#nav'),
+    titleEl:q('#pageTitle'),
+    subEl:q('#pageSub'),
+    getPassword:function(){return pw();},
+    notice:function(msg,bad){flash(msg,bad);}
+  });
+  setInterval(function(){if(state.page==='overview')loadStatus();},5000);
 })();
 </script>
 </body>

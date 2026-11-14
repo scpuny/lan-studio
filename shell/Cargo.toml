@@ -11,3 +11,4 @@ description = "Lan Studio Shell unified navigation exit (M5 aggregation layer, n
 # Context by hand without going through common-component::run (which would bind
 # GET / to the six-region component console and register 18 standard endpoints).
 common-api = { workspace = true }
+common-auth = { workspace = true }

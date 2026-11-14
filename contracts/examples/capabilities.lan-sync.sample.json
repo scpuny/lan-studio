@@ -1,0 +1,309 @@
+{
+  "schema": 1,
+  "component": "lan-sync",
+  "runtime": "common-component",
+  "libs": [
+    "common-component"
+  ],
+  "modules": [
+    {
+      "id": "core.status",
+      "title": "状态总览",
+      "icon": "grid",
+      "tone": "blue",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "status.kv",
+          "title": "运行状态",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/status"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.config",
+      "title": "配置管理",
+      "icon": "sliders",
+      "tone": "indigo",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "config.editor",
+          "title": "配置编辑器",
+          "widget": "code-editor",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config"
+          },
+          "actions": [
+            {
+              "id": "save",
+              "label": "校验并保存",
+              "method": "POST",
+              "path": "/api/config",
+              "write": true
+            },
+            {
+              "id": "reload",
+              "label": "重新载入",
+              "method": "POST",
+              "path": "/api/reload",
+              "write": true
+            },
+            {
+              "id": "export",
+              "label": "导出快照",
+              "method": "GET",
+              "path": "/api/config/snapshot"
+            },
+            {
+              "id": "import",
+              "label": "导入快照",
+              "method": "POST",
+              "path": "/api/config/snapshot",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "core.observe",
+      "title": "可观测",
+      "icon": "activity",
+      "tone": "cyan",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "observe.metrics",
+          "title": "Prometheus 指标",
+          "widget": "text-view",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/metrics"
+          }
+        },
+        {
+          "id": "observe.logs",
+          "title": "最近日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.logs",
+      "title": "日志",
+      "icon": "terminal",
+      "tone": "teal",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "logs.list",
+          "title": "运行日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.alerts",
+      "title": "告警",
+      "icon": "bell",
+      "tone": "amber",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "alerts.kv",
+          "title": "告警通道",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/alerts"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.history",
+      "title": "版本历史",
+      "icon": "history",
+      "tone": "purple",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "history.list",
+          "title": "快照与回滚",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config/history"
+          },
+          "actions": [
+            {
+              "id": "rollback",
+              "label": "回滚",
+              "method": "POST",
+              "path": "/api/config/rollback",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lan-sync.nodes",
+      "title": "同步节点",
+      "icon": "sync",
+      "tone": "green",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "sync.nodes",
+          "title": "已登记节点",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/sync/nodes"
+          },
+          "columns": [
+            {
+              "key": "name",
+              "label": "节点"
+            },
+            {
+              "key": "url",
+              "label": "地址"
+            },
+            {
+              "key": "status",
+              "label": "状态"
+            }
+          ],
+          "actions": [
+            {
+              "id": "upsert",
+              "label": "登记节点",
+              "method": "POST",
+              "path": "/api/sync/node",
+              "fields": [
+                {
+                  "key": "name",
+                  "label": "节点",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "key": "url",
+                  "label": "地址",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            },
+            {
+              "id": "remove",
+              "label": "移除",
+              "method": "POST",
+              "path": "/api/sync/remove",
+              "fields": [
+                {
+                  "key": "name",
+                  "label": "节点",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            }
+          ]
+        },
+        {
+          "id": "sync.status",
+          "title": "同步状态",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/sync/status"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lan-sync.transfer",
+      "title": "配置传输",
+      "icon": "sync",
+      "tone": "blue",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "sync.history",
+          "title": "决策历史",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/sync/history"
+          },
+          "actions": [
+            {
+              "id": "pull",
+              "label": "拉取",
+              "method": "POST",
+              "path": "/api/sync/pull",
+              "fields": [
+                {
+                  "key": "name",
+                  "label": "节点",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            },
+            {
+              "id": "push",
+              "label": "推送",
+              "method": "POST",
+              "path": "/api/sync/push",
+              "fields": [
+                {
+                  "key": "name",
+                  "label": "节点",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            },
+            {
+              "id": "confirm",
+              "label": "确认冲突",
+              "method": "POST",
+              "path": "/api/sync/confirm",
+              "fields": [
+                {
+                  "key": "id",
+                  "label": "决策 ID",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

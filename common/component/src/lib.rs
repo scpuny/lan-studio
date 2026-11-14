@@ -23,8 +23,15 @@ use common_health::Health;
 use common_log::{EventSource, LogBuffer, RotatingFile};
 use common_metrics::Registry;
 
+pub mod capabilities;
+
 /// Offline console: six first-level areas, inlined CSS/JS, zero external URLs.
+/// `__CAPABILITIES__` is replaced at serve time with the component manifest.
 pub const CONSOLE_HTML: &str = include_str!("assets/console.html");
+
+/// Shared capability renderer, embedded into the component console and reused
+/// by the Shell SPA. Injected at serve time via `__RENDERER_JS__`.
+pub const RENDERER_JS: &str = include_str!("assets/console-renderer.js");
 
 pub type Flat = HashMap<String, String>;
 
@@ -538,11 +545,20 @@ fn rt(req: &Request) -> Result<&'static Arc<Runtime>, Response> {
 // ---------------------------------------------------------------------------
 
 fn view_index(_: &Request, ctx: &Context) -> Response {
-    if ctx.webui {
-        Response::html(200, CONSOLE_HTML.to_string())
-    } else {
-        Response::text(404, "webui disabled".to_string())
+    if !ctx.webui {
+        return Response::text(404, "webui disabled".to_string());
     }
+    let name = RUNTIME
+        .get()
+        .map(|runtime| runtime.hooks.name)
+        .unwrap_or("component");
+    let caps = capabilities::for_component(name).unwrap_or("null");
+    Response::html(
+        200,
+        CONSOLE_HTML
+            .replace("__CAPABILITIES__", caps)
+            .replace("__RENDERER_JS__", RENDERER_JS),
+    )
 }
 
 fn view_healthz(_: &Request, _: &Context) -> Response {

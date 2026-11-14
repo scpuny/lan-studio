@@ -1,0 +1,286 @@
+{
+  "schema": 1,
+  "component": "lan-hosts",
+  "runtime": "common-component",
+  "libs": [
+    "common-component"
+  ],
+  "modules": [
+    {
+      "id": "core.status",
+      "title": "状态总览",
+      "icon": "grid",
+      "tone": "blue",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "status.kv",
+          "title": "运行状态",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/status"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.config",
+      "title": "配置管理",
+      "icon": "sliders",
+      "tone": "indigo",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "config.editor",
+          "title": "配置编辑器",
+          "widget": "code-editor",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config"
+          },
+          "actions": [
+            {
+              "id": "save",
+              "label": "校验并保存",
+              "method": "POST",
+              "path": "/api/config",
+              "write": true
+            },
+            {
+              "id": "reload",
+              "label": "重新载入",
+              "method": "POST",
+              "path": "/api/reload",
+              "write": true
+            },
+            {
+              "id": "export",
+              "label": "导出快照",
+              "method": "GET",
+              "path": "/api/config/snapshot"
+            },
+            {
+              "id": "import",
+              "label": "导入快照",
+              "method": "POST",
+              "path": "/api/config/snapshot",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "core.observe",
+      "title": "可观测",
+      "icon": "activity",
+      "tone": "cyan",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "observe.metrics",
+          "title": "Prometheus 指标",
+          "widget": "text-view",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/metrics"
+          }
+        },
+        {
+          "id": "observe.logs",
+          "title": "最近日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.logs",
+      "title": "日志",
+      "icon": "terminal",
+      "tone": "teal",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "logs.list",
+          "title": "运行日志",
+          "widget": "log-list",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/logs"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.alerts",
+      "title": "告警",
+      "icon": "bell",
+      "tone": "amber",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "alerts.kv",
+          "title": "告警通道",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/alerts"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core.history",
+      "title": "版本历史",
+      "icon": "history",
+      "tone": "purple",
+      "area": "workspace",
+      "panels": [
+        {
+          "id": "history.list",
+          "title": "快照与回滚",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/config/history"
+          },
+          "actions": [
+            {
+              "id": "rollback",
+              "label": "回滚",
+              "method": "POST",
+              "path": "/api/config/rollback",
+              "write": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lan-hosts.mappings",
+      "title": "静态映射",
+      "icon": "hosts",
+      "tone": "indigo",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "hosts.mappings",
+          "title": "映射清单",
+          "widget": "table",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/hosts/mappings"
+          },
+          "columns": [
+            {
+              "key": "name",
+              "label": "主机名"
+            },
+            {
+              "key": "ip",
+              "label": "地址"
+            },
+            {
+              "key": "comment",
+              "label": "备注"
+            }
+          ],
+          "actions": [
+            {
+              "id": "upsert",
+              "label": "新增/更新",
+              "method": "POST",
+              "path": "/api/hosts/mapping",
+              "fields": [
+                {
+                  "key": "name",
+                  "label": "主机名",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "key": "ip",
+                  "label": "地址",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            },
+            {
+              "id": "remove",
+              "label": "删除",
+              "method": "POST",
+              "path": "/api/hosts/remove",
+              "fields": [
+                {
+                  "key": "name",
+                  "label": "主机名",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "write": true
+            },
+            {
+              "id": "import",
+              "label": "导入",
+              "method": "POST",
+              "path": "/api/hosts/import",
+              "fields": [
+                {
+                  "key": "text",
+                  "label": "映射文本",
+                  "type": "textarea",
+                  "required": true
+                }
+              ],
+              "write": true
+            }
+          ]
+        },
+        {
+          "id": "hosts.status",
+          "title": "发布状态",
+          "widget": "kv-grid",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/hosts/status"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lan-hosts.render",
+      "title": "渲染与发布",
+      "icon": "terminal",
+      "tone": "teal",
+      "area": "feature",
+      "panels": [
+        {
+          "id": "hosts.render",
+          "title": "hosts 预览",
+          "widget": "text-view",
+          "endpoint": {
+            "method": "GET",
+            "path": "/api/hosts/render"
+          },
+          "actions": [
+            {
+              "id": "publish",
+              "label": "原子发布",
+              "method": "POST",
+              "path": "/api/hosts/publish",
+              "write": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

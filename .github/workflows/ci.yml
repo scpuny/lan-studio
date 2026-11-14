@@ -64,6 +64,9 @@ jobs:
       - name: Verify M0 contracts (full)
         run: python3 scripts/verify_contracts.py
 
+      - name: Verify M6 capability manifests match backend routes
+        run: python3 scripts/gen_capabilities.py --check
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -90,7 +93,7 @@ jobs:
       - name: Offline checks for every binary
         run: |
           set -e
-          python3 -m py_compile scripts/test_m5.py scripts/test_ecosystem.py
+          python3 -m py_compile scripts/test_m5.py scripts/test_m6.py scripts/test_ecosystem.py scripts/gen_capabilities.py
           for bin in lan-mdns lan-relay lan-ca lan-scan lan-hosts lan-wol lan-sync lan-ssdp lan-shell; do
             if [ "$bin" = "lan-mdns" ]; then
               LAN_STUDIO_CONFIG="$(mktemp)" ./target/debug/lan-mdns --validate
@@ -101,6 +104,9 @@ jobs:
 
       - name: M5 runtime gate (sync / ssdp / shell + unified service record)
         run: python3 scripts/test_m5.py
+
+      - name: M6 runtime gate (capability-driven UI + bounded same-origin proxy)
+        run: python3 scripts/test_m6.py
 
       - name: Ecosystem DoD (PRD 8.2, six gates)
         run: python3 scripts/test_ecosystem.py
