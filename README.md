@@ -44,6 +44,7 @@ lan-studio/
 │   ├── M4-PLAN.md / M4-CHECKLIST.md    # P1 方案与销项
 │   ├── M5-PLAN.md / M5-CHECKLIST.md    # P2 + 统一出口方案与生态销项
 │   ├── M6-PLAN.md / M6-CHECKLIST.md  # 前端聚合方案与销项
+│   ├── M7-PLAN.md                # lan-webui 前后端一体方案
 │   ├── METRICS.md  ALERT-SCHEMA.md  ERROR-CODES.md
 │   └── ADR/               # 0001 M1 … 0007 M5 生态收敛 / 0008 M6 前端聚合
 ├── contracts/             # 机器可读契约（语言无关）
@@ -318,3 +319,6 @@ python3 scripts/test_api_contract.py
   只有被引用的模块才生成导航、面板与控件，未引用模块不产生 DOM；清单漂移由 CI 拦截。
   方案见 [`docs/M6-PLAN.md`](docs/M6-PLAN.md)，销项见
   [`docs/M6-CHECKLIST.md`](docs/M6-CHECKLIST.md)。
+- 下一项工程演进 **M7**：把 `lan-mdns/webui` 迁为独立项目 `lan-webui/`，同目录内含 Vue
+  前端与自己的 Rust 后端，后端按 `modules.yaml` 引入模块并合成能力清单，前端只渲染清单
+  中的模块；方案见 [`docs/M7-PLAN.md`](docs/M7-PLAN.md)。
